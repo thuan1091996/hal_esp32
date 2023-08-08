@@ -91,10 +91,11 @@ void sntp_time_init()
 {
     /* SNTP */
     ESP_LOGI("SNTP", "Initializing SNTP");
-
+    esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
     sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
     sntp_setservername(0, "pool.ntp.org");
     sntp_set_time_sync_notification_cb(&sntp_got_time_cb);
+    esp_sntp_init();
 }
 
 void smartconfig_init()
@@ -107,7 +108,6 @@ void smartconfig_init()
 void wifi_on_connected_cb(void)
 {
     ESP_LOGW("custom_wifi", "On Wi-Fi connected callback");
-    sntp_time_init();
     wifi_custom__get_rssi();
 }
 
@@ -289,6 +289,7 @@ int wifi_init_sta(void)
 
             ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
             ESP_LOGI("custom_wifi", "wifi_init_sta finished.");
+            sntp_time_init();
             return 0;
     } while (0);
     
