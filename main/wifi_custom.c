@@ -127,22 +127,22 @@ void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
 
             case WIFI_REASON_ASSOC_LEAVE:
             {
-                ESP_LOGE("Wi-Fi", "STA left");
+                ESP_LOGE("wifi_custom", "STA left");
                 xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
                 break;
             }
 
             case WIFI_REASON_AUTH_FAIL:
             {
-                ESP_LOGE("Wi-Fi", "Authentication failed. Wrong credentials provided.");
-                ESP_LOGW("Wifi", "Start smartconfig to update credentials");
+                ESP_LOGE("wifi_custom", "Authentication failed. Wrong credentials provided.");
+                ESP_LOGW("wifi_custom", "Start smartconfig to update credentials");
                 xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
                 smartconfig_init();
                 break;
             }
             case WIFI_REASON_NO_AP_FOUND:
             {
-                ESP_LOGE("Wi-Fi", "STA AP Not found");
+                ESP_LOGE("wifi_custom", "STA AP Not found");
             }
             // case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
             // case WIFI_REASON_AUTH_EXPIRE:
@@ -158,7 +158,7 @@ void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
                 }
                 else if(s_retry_num < WIFI_RETRY_CONN_MAX)
                 {
-                    ESP_LOGW("Wifi", "Start smartconfig to update credentials");
+                    ESP_LOGW("wifi_custom", "Start smartconfig to update credentials");
                     smartconfig_init();
                     esp_wifi_connect();
                     s_retry_num++;
