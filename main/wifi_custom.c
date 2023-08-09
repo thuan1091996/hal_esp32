@@ -78,9 +78,6 @@ static EventGroupHandle_t s_wifi_event_group;
 *******************************************************************************/
 void sntp_got_time_cb(struct timeval *tv)
 {
-    //TODO: Set time zone
-    // setenv("TZ","UTC+7",1);
-    // tzset();
     struct tm *time_now = localtime(&tv->tv_sec);
     char time_str[50]={0};
     strftime(time_str, sizeof(time_str), "%c", time_now);
@@ -95,7 +92,7 @@ void sntp_time_init()
     sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
     sntp_setservername(0, "pool.ntp.org");
     sntp_set_time_sync_notification_cb(&sntp_got_time_cb);
-    esp_sntp_init();
+    sntp_init();
 }
 
 void smartconfig_init()
@@ -119,12 +116,6 @@ void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
 	{
         ESP_LOGI("custom_wifi", "WIFI_EVENT_STA_START");
 		ESP_LOGI("custom_wifi", "Wi-Fi STATION started successfully \r\n");
-        esp_err_t status = esp_wifi_connect();
-        if(status != ESP_OK)
-        {
-            ESP_LOGE("custom_wifi", "esp_wifi_connect() failed with error %d", status);
-        }
-
 	}
 	else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
 	{
@@ -133,28 +124,45 @@ void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
         ESP_LOGW("custom_wifi", "Wi-Fi disconnected, reason: %d", event->reason);        
         switch (event->reason)
         {
+
+            case WIFI_REASON_ASSOC_LEAVE:
+            {
+                ESP_LOGE("Wi-Fi", "STA left");
+                xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+                break;
+            }
+
+            case WIFI_REASON_AUTH_FAIL:
+            {
+                ESP_LOGE("Wi-Fi", "Authentication failed. Wrong credentials provided.");
+                ESP_LOGW("Wifi", "Start smartconfig to update credentials");
+                xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+                smartconfig_init();
+                break;
+            }
             case WIFI_REASON_NO_AP_FOUND:
             {
                 ESP_LOGE("Wi-Fi", "STA AP Not found");
             }
-            case WIFI_REASON_AUTH_FAIL:
-            {
-                ESP_LOGE("Wi-Fi", "Authentication failed. Wrong credentials provided.");
-            }            
-            case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
-            case WIFI_REASON_AUTH_EXPIRE:
-            ESP_LOGW("Wifi", "Start smartconfig to update credentials");
-            smartconfig_init();
-            break;
+            // case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+            // case WIFI_REASON_AUTH_EXPIRE:
 
             default:
             {
-                if (s_retry_num < WIFI_RETRY_CONN_MAX)
+                if (s_retry_num < 3)
                 {
                     esp_wifi_connect();
                     s_retry_num++;
                     xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
                     ESP_LOGI("custom_wifi", "retry to connect to the AP");
+                }
+                else if(s_retry_num < WIFI_RETRY_CONN_MAX)
+                {
+                    ESP_LOGW("Wifi", "Start smartconfig to update credentials");
+                    smartconfig_init();
+                    esp_wifi_connect();
+                    s_retry_num++;
+                    xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
                 }
                 else
                 {
@@ -330,7 +338,11 @@ int wifi_custom__power_on(void)
         ESP_LOGE("custom_wifi", "esp_wifi_start() failed");
         return -1;
     }
-
+    esp_err_t status = esp_wifi_connect();
+    if(status != ESP_OK)
+    {
+        ESP_LOGE("custom_wifi", "esp_wifi_connect() failed with error %d", status);
+    }
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
@@ -383,6 +395,34 @@ int wifi_custom__connected(void)
 //Implements esp_wifi functions to get the current time.
 long wifi_custom__get_time(void)
 {
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    // Is time set? If not, tm_year will be (1970 - 1900).
+    if (timeinfo.tm_year < (2016 - 1900)) 
+    {
+        ESP_LOGI("SNTP", "Time is not set yet. Getting time info");
+        int retry=0, retry_count=10;
+        while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET && ++retry < retry_count) 
+        {
+            ESP_LOGI("SNTP", "Waiting for system time to be set... (%d/%d)", retry, retry_count);
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
+            if(retry == (retry_count-1))
+            {
+                ESP_LOGE("SNTP", "Failed to get time from SNTP server");
+                return -1;
+            }
+        }
+            //TODO: Set time zone
+        setenv("TZ","UTC+7",1);
+        tzset();
+        time(&now);
+        localtime_r(&now, &timeinfo);
+        // update 'now' variable with current time
+        time(&now);
+    }
+
     int timestamp = time(NULL);
     ESP_LOGI("SNTP", "Unix timestamp: %d", timestamp);
     return timestamp;
