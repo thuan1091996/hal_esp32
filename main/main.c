@@ -17,7 +17,7 @@
 #include "hal.h"
 #include "nrf_slte.h"
 
-#define TEST_WIFI_API          (1)
+#define TEST_WIFI_API          (0)
 
 void wifi_custom__task(void *pvParameters);
 

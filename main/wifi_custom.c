@@ -104,24 +104,24 @@ void smartconfig_init()
 
 void wifi_on_connected_cb(void)
 {
-    ESP_LOGW("custom_wifi", "On Wi-Fi connected callback");
+    ESP_LOGW("wifi_custom", "On Wi-Fi connected callback");
     wifi_custom__get_rssi();
 }
 
 void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
 	static int s_retry_num = 0;
-	ESP_LOGI("custom_wifi", "Event handler invoked \r\n");
+	ESP_LOGI("wifi_custom", "Event handler invoked \r\n");
 	if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
 	{
-        ESP_LOGI("custom_wifi", "WIFI_EVENT_STA_START");
-		ESP_LOGI("custom_wifi", "Wi-Fi STATION started successfully \r\n");
+        ESP_LOGI("wifi_custom", "WIFI_EVENT_STA_START");
+		ESP_LOGI("wifi_custom", "Wi-Fi STATION started successfully \r\n");
 	}
 	else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
 	{
-        ESP_LOGI("custom_wifi", "WIFI_EVENT_STA_DISCONNECTED");
+        ESP_LOGI("wifi_custom", "WIFI_EVENT_STA_DISCONNECTED");
         wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
-        ESP_LOGW("custom_wifi", "Wi-Fi disconnected, reason: %d", event->reason);        
+        ESP_LOGW("wifi_custom", "Wi-Fi disconnected, reason: %d", event->reason);        
         switch (event->reason)
         {
 
@@ -154,7 +154,7 @@ void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
                     esp_wifi_connect();
                     s_retry_num++;
                     xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-                    ESP_LOGI("custom_wifi", "retry to connect to the AP");
+                    ESP_LOGI("wifi_custom", "retry to connect to the AP");
                 }
                 else if(s_retry_num < WIFI_RETRY_CONN_MAX)
                 {
@@ -175,23 +175,23 @@ void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
 
 	else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
 	{
-        ESP_LOGI("custom_wifi", "IP_EVENT_STA_GOT_IP");
+        ESP_LOGI("wifi_custom", "IP_EVENT_STA_GOT_IP");
 		ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-		ESP_LOGI("custom_wifi", "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+		ESP_LOGI("wifi_custom", "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
 		s_retry_num = 0;
 		xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
 	}
     else if (event_base == SC_EVENT && event_id == SC_EVENT_SCAN_DONE) 
     {
-        ESP_LOGI("custom_wifi", "Scan done");
+        ESP_LOGI("wifi_custom", "Scan done");
     }
     else if (event_base == SC_EVENT && event_id == SC_EVENT_FOUND_CHANNEL) 
     {
-        ESP_LOGI("custom_wifi", "Found channel");
+        ESP_LOGI("wifi_custom", "Found channel");
     } 
     else if (event_base == SC_EVENT && event_id == SC_EVENT_GOT_SSID_PSWD) 
     {
-        ESP_LOGI("custom_wifi", "Got SSID and password");
+        ESP_LOGI("wifi_custom", "Got SSID and password");
 
         smartconfig_event_got_ssid_pswd_t *evt = (smartconfig_event_got_ssid_pswd_t *)event_data;
         wifi_config_t wifi_config;
@@ -207,11 +207,11 @@ void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
 
         memcpy(ssid, evt->ssid, sizeof(evt->ssid));
         memcpy(password, evt->password, sizeof(evt->password));
-        ESP_LOGI("custom_wifi", "SSID:%s", ssid);
-        ESP_LOGI("custom_wifi", "PASSWORD:%s", password);
+        ESP_LOGI("wifi_custom", "SSID:%s", ssid);
+        ESP_LOGI("wifi_custom", "PASSWORD:%s", password);
         if (evt->type == SC_TYPE_ESPTOUCH_V2) {
             ESP_ERROR_CHECK( esp_smartconfig_get_rvd_data(rvd_data, sizeof(rvd_data)) );
-            ESP_LOGI("custom_wifi", "RVD_DATA:");
+            ESP_LOGI("wifi_custom", "RVD_DATA:");
             for (int i=0; i<33; i++) {
                 printf("%02x ", rvd_data[i]);
             }
@@ -220,14 +220,14 @@ void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
 
         ESP_ERROR_CHECK( esp_wifi_disconnect() );
         // Store SSID and password in NVS
-        ESP_LOGI("custom_wifi", "Storing SSID: %s, password: %s in NVS", wifi_config.sta.ssid, wifi_config.sta.password);
+        ESP_LOGI("wifi_custom", "Storing SSID: %s, password: %s in NVS", wifi_config.sta.ssid, wifi_config.sta.password);
         ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
         xEventGroupSetBits(s_wifi_event_group, ESPTOUCH_GOT_CREDENTIAL);
         esp_wifi_connect();
     } 
     else if (event_base == SC_EVENT && event_id == SC_EVENT_SEND_ACK_DONE) 
     {
-        ESP_LOGI("custom_wifi", "Smartconfig finished send ACK");
+        ESP_LOGI("wifi_custom", "Smartconfig finished send ACK");
         esp_smartconfig_stop();
     }
 }
@@ -285,18 +285,18 @@ int wifi_init_sta(void)
                     memcpy(&wifi_config, &wifi_config_loaded, sizeof(wifi_config_t));
                     memcpy(ssid, wifi_config_loaded.sta.ssid, strlen((char*)wifi_config_loaded.sta.ssid));
                     memcpy(password, wifi_config_loaded.sta.password, strlen((char*)wifi_config_loaded.sta.password));
-                    ESP_LOGI("custom_wifi", "SSID loaded from NVS: %s", ssid);
-                    ESP_LOGI("custom_wifi", "PASSWORD: %s", password);
+                    ESP_LOGI("wifi_custom", "SSID loaded from NVS: %s", ssid);
+                    ESP_LOGI("wifi_custom", "PASSWORD: %s", password);
                 }
                 else
                 {
-                    ESP_LOGE("custom_wifi", "No SSID stored in NVS");
+                    ESP_LOGE("wifi_custom", "No SSID stored in NVS");
                 }
             }
         #endif /* End of LOAD_WIFI_CREDENTIAL_NVS */
 
             ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
-            ESP_LOGI("custom_wifi", "wifi_init_sta finished.");
+            ESP_LOGI("wifi_custom", "wifi_init_sta finished.");
             sntp_time_init();
             return 0;
     } while (0);
@@ -306,22 +306,22 @@ int wifi_init_sta(void)
 
 int wifi_custom_init(void)
 {
-    esp_log_level_set("custom_wifi", ESP_LOG_INFO);
+    esp_log_level_set("wifi_custom", ESP_LOG_INFO);
     //Initialize NVS
     esp_err_t ret = nvs_flash_init();
     ESP_ERROR_CHECK(ret);
     if (ESP_OK != ret)
     {
-        ESP_LOGE("custom_wifi", "Failed to initialize NVS Flash. Erasing and re-initializing...");
+        ESP_LOGE("wifi_custom", "Failed to initialize NVS Flash. Erasing and re-initializing...");
         ESP_ERROR_CHECK(nvs_flash_erase());
         if (nvs_flash_init() != ESP_OK)
         {
-            ESP_LOGE("custom_wifi", "Failed to erase and re-initialize NVS Flash. Aborting...");
+            ESP_LOGE("wifi_custom", "Failed to erase and re-initialize NVS Flash. Aborting...");
             return -1;
         }
     }
-    ESP_LOGI("custom_wifi", "NVS Flash initialized \r\n");    
-    ESP_LOGI("custom_wifi", "Initializing Wi-Fi station \r\n");
+    ESP_LOGI("wifi_custom", "NVS Flash initialized \r\n");    
+    ESP_LOGI("wifi_custom", "Initializing Wi-Fi station \r\n");
 
     return wifi_init_sta();
 }
@@ -335,13 +335,13 @@ int wifi_custom__power_on(void)
 {
     if(esp_wifi_start() != ESP_OK)
     {
-        ESP_LOGE("custom_wifi", "esp_wifi_start() failed");
+        ESP_LOGE("wifi_custom", "esp_wifi_start() failed");
         return -1;
     }
     esp_err_t status = esp_wifi_connect();
     if(status != ESP_OK)
     {
-        ESP_LOGE("custom_wifi", "esp_wifi_connect() failed with error %d", status);
+        ESP_LOGE("wifi_custom", "esp_wifi_connect() failed with error %d", status);
     }
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
@@ -355,18 +355,18 @@ int wifi_custom__power_on(void)
     {
         if(bits & ESPTOUCH_GOT_CREDENTIAL) 
         {
-            ESP_LOGI("custom_wifi", "connected to ap SSID:%s password:%s", ssid, password);
+            ESP_LOGI("wifi_custom", "connected to ap SSID:%s password:%s", ssid, password);
         }
         wifi_on_connected_cb();
         return 0;
     }
     else if (bits & WIFI_FAIL_BIT)
     {
-        ESP_LOGE("custom_wifi", "Failed to connect to SSID:%s, password:%s", ssid, password);
+        ESP_LOGE("wifi_custom", "Failed to connect to SSID:%s, password:%s", ssid, password);
     }
     else
     {
-        ESP_LOGE("custom_wifi", "UNEXPECTED EVENT");
+        ESP_LOGE("wifi_custom", "UNEXPECTED EVENT");
     }
     return -1;
 } 
@@ -382,12 +382,12 @@ int wifi_custom__connected(void)
         EventBits_t bit_mask = xEventGroupGetBits(s_wifi_event_group);
     if(bit_mask & WIFI_CONNECTED_BIT)
     {
-        ESP_LOGI("custom_wifi", "Wi-Fi is connected");
+        ESP_LOGI("wifi_custom", "Wi-Fi is connected");
         return 1;
     }
     else
     {   
-        ESP_LOGI("custom_wifi", "Wi-Fi is not connected");
+        ESP_LOGI("wifi_custom", "Wi-Fi is not connected");
         return 0;
     }
     
@@ -434,15 +434,15 @@ int wifi_custom__get_rssi(void)
     esp_err_t status = esp_wifi_sta_get_ap_info(&ap_info);
     if(status == ESP_ERR_WIFI_NOT_CONNECT)
     {
-        ESP_LOGE("custom_wifi", "Wi-Fi is not connected");
+        ESP_LOGE("wifi_custom", "Wi-Fi is not connected");
         return -1;
     }
     else if(status != ESP_OK)
     {
-        ESP_LOGE("custom_wifi", "esp_wifi_sta_get_ap_info() failed with error %d", status);
+        ESP_LOGE("wifi_custom", "esp_wifi_sta_get_ap_info() failed with error %d", status);
         return -1;
     }
-    ESP_LOGI("custom_wifi", "RSSI of SSID %s: %d", ap_info.ssid, ap_info.rssi);
+    ESP_LOGI("wifi_custom", "RSSI of SSID %s: %d", ap_info.ssid, ap_info.rssi);
     return ap_info.rssi;
 }
 
@@ -452,42 +452,42 @@ int wifi_custom__printCA()
     nvs_handle handle;
     if (nvs_open("certs", NVS_READONLY, &handle) != ESP_OK)
     {
-        ESP_LOGE("custom_wifi", "Failed to open NVS");
+        ESP_LOGE("wifi_custom", "Failed to open NVS");
         return -1;
     }
 
     // Load the certificate
-    ESP_LOGI("custom_wifi", "Loading certificate");
+    ESP_LOGI("wifi_custom", "Loading certificate");
  
     // Try to get the size of the item
     size_t value_size;
     if(nvs_get_str(handle, "certificate", NULL, &value_size) != ESP_OK){
-        ESP_LOGE("custom_wifi", "Failed to get size of key: %s", "certificate");
+        ESP_LOGE("wifi_custom", "Failed to get size of key: %s", "certificate");
         return -1;
     }
 
     char* value = malloc(value_size);
     if (value == NULL)
     {
-        ESP_LOGE("custom_wifi", "Failed to allocate memory for certificate");
+        ESP_LOGE("wifi_custom", "Failed to allocate memory for certificate");
         return -1;
     }
     do
     {
         if(nvs_get_str(handle, "certificate", value, &value_size) != ESP_OK) {
-            ESP_LOGE("custom_wifi", "Failed to load key: %s", "certificate");
+            ESP_LOGE("wifi_custom", "Failed to load key: %s", "certificate");
             break;
         }
 
         if(value == NULL){
-            ESP_LOGE("custom_wifi", "Certificate could not be loaded");
+            ESP_LOGE("wifi_custom", "Certificate could not be loaded");
             break;
         }
 
         nvs_close(handle);
 
         // Print the certificate
-        ESP_LOGI("custom_wifi", "Certificate: %s", value);
+        ESP_LOGI("wifi_custom", "Certificate: %s", value);
         free(value);
         return 0;
 
@@ -503,22 +503,22 @@ int wifi_custom__setCA(char* cert)
     nvs_handle handle;
     if(nvs_open("certs", NVS_READWRITE, &handle) != ESP_OK)
     {
-        ESP_LOGE("custom_wifi", "Failed to open NVS");
+        ESP_LOGE("wifi_custom", "Failed to open NVS");
         return -1;
     }
 
     // Write the certificate
-    ESP_LOGI("custom_wifi", "Writing certificate");
+    ESP_LOGI("wifi_custom", "Writing certificate");
     if (nvs_set_str(handle, "certificate", cert) != ESP_OK)
     {
-        ESP_LOGE("custom_wifi", "Failed to write key: %s", "certificate");
+        ESP_LOGE("wifi_custom", "Failed to write key: %s", "certificate");
         return -1;
     }
 
     // Commit written value and close
     if (nvs_commit(handle) != ESP_OK)
     {
-        ESP_LOGE("custom_wifi", "Failed to commit NVS");
+        ESP_LOGE("wifi_custom", "Failed to commit NVS");
         return -1;
     }
     
