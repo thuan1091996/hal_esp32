@@ -45,11 +45,12 @@
 * Function Definitions
 *******************************************************************************/
 // More on: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
+
+// state = 0 -> High impedance, 1 -> Output, 2 -> Input pull-down, 3 -> Input pull-up
 int hal__setState(uint8_t pinNum, uint8_t state)
 {
     param_check(GPIO_IS_VALID_GPIO(pinNum));
-
-    param_check( (0 <= state) && (state <= 2) );
+    param_check( (0 <= state) && (state <= 3) );
 
     gpio_num_t gpio_num = pinNum;
     gpio_config_t io_config = {
@@ -72,6 +73,11 @@ int hal__setState(uint8_t pinNum, uint8_t state)
         // High impedance -> input with pull-down
         io_config.mode = GPIO_MODE_INPUT;
         io_config.pull_down_en = GPIO_PULLDOWN_ENABLE;
+    }
+    else if (state == 3)
+    {
+        io_config.mode = GPIO_MODE_INPUT;
+        io_config.pull_up_en = GPIO_PULLUP_ENABLE;
     }
     else
     {
