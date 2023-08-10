@@ -35,6 +35,7 @@
 #define I2C_SDA_IO              (23)
 #define I2C_SCL_IO              (25)
 #define I2C_DEFAULT_TIMEOUT     (3000 / portTICK_PERIOD_MS)
+#define I2C_NUM                 (2)
 /******************************************************************************
 * Module Preprocessor Macros
 *******************************************************************************/
@@ -46,7 +47,8 @@
 /******************************************************************************
 * Module Variable Definitions
 *******************************************************************************/
-
+// Mutex for I2C0 and I2C1
+SemaphoreHandle_t i2c_mutex[I2C_NUM] = {NULL, NULL};
 /******************************************************************************
 * Function Prototypes
 *******************************************************************************/
@@ -82,6 +84,26 @@ int __initI2C0()
     return SUCCESS;
 }
 
+// Initialize I2C0 and I2C1. Returns 0 on success, -1 on failure.
+int __initI2C()
+{
+    int status = FAILURE;
+    status = __initI2C0();
+    if(status != SUCCESS)
+    {
+        ESP_LOGE(TAG, "Failed to init I2C0");
+        return FAILURE;
+    }
+    // Create mutex for I2C0
+    i2c_mutex[0] = xSemaphoreCreateMutex();
+    if(i2c_mutex[0] == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to create mutex for I2C0");
+        return FAILURE;
+    }
+    return SUCCESS;
+}
+
 bool hal__I2CEXISTS(uint8_t i2c_num, uint8_t ADDR)
 {
     param_check(i2c_num == 0 || i2c_num == 1);
@@ -112,55 +134,92 @@ bool hal__I2CEXISTS(uint8_t i2c_num, uint8_t ADDR)
 int hal__I2CREAD_uint8(uint8_t i2c_num, uint8_t ADDR, uint8_t REG, uint8_t *data)
 {
     param_check(i2c_num == 0 || i2c_num == 1);
-    //Read data from I2C device at ADDR, register REG. Returns 0 on success, -1 on failure.
+    // Acquire the I2C mutex
+    xSemaphoreTake(i2c_mutex[i2c_num], portMAX_DELAY);
+    
+    // Read data from I2C device at ADDR, register REG. Returns 0 on success, -1 on failure.
     esp_err_t status = i2c_master_write_read_device(i2c_num, ADDR, &REG, 1, data, 1, I2C_DEFAULT_TIMEOUT);
     if(status != ESP_OK)
     {
         ESP_LOGE(TAG, "I2C read failed with status %d", status);
-        return FAILURE;
+        // Release the I2C mutex
+        xSemaphoreGive(i2c_mutex[i2c_num]);
+        status = FAILURE;
     }
-    ESP_LOGI(TAG, "hal__I2CREAD_uint8 read at address 0x%02X, register 0x%02X, data 0x%02X", ADDR, REG, *data);
-    return SUCCESS;
+    else
+    { 
+        ESP_LOGI(TAG, "hal__I2CREAD_uint8 read at address 0x%02X, register 0x%02X, data 0x%02X", ADDR, REG, *data);
+    }
+    // Release the I2C mutex
+    xSemaphoreGive(i2c_mutex[i2c_num]);
+    return status;
 }
 
 int hal__I2CREAD(uint8_t i2c_num, uint8_t ADDR, uint8_t REG, uint8_t *data, uint16_t len)
 {
     param_check(i2c_num == 0 || i2c_num == 1);
-    //Read data from I2C device at ADDR, register REG. Returns number of bytes read on success, -1 on failure.
+    // Acquire the I2C mutex
+    xSemaphoreTake(i2c_mutex[i2c_num], portMAX_DELAY);
+    
+    // Read data from I2C device at ADDR, register REG. Returns number of bytes read on success, -1 on failure.
     esp_err_t status = i2c_master_write_read_device(i2c_num, ADDR, &REG, 1, data, len, I2C_DEFAULT_TIMEOUT);
     if(status != ESP_OK)
     {
         ESP_LOGE(TAG, "I2C read failed with status %d", status);
-        return FAILURE;
+        status = FAILURE;
     }
-    ESP_LOGI(TAG, "hal__I2CREAD read at address 0x%02X, register 0x%02X, data 0x%02X", ADDR, REG, *data);
-    return SUCCESS;
+    else
+    {
+        ESP_LOGI(TAG, "hal__I2CREAD read at address 0x%02X, register 0x%02X, data 0x%02X", ADDR, REG, *data);
+    }
+
+    // Release the I2C mutex
+    xSemaphoreGive(i2c_mutex[i2c_num]);
+    return status;
 }
 
 int hal__I2CWRITE_uint8(uint8_t i2c_num, uint8_t ADDR, uint8_t REG, uint8_t data)
 {
     param_check(i2c_num == 0 || i2c_num == 1);
     //Write data to I2C device at ADDR, register REG. Returns 0 on success, -1 on failure.
+
+    // Acquire the I2C mutex
+    xSemaphoreTake(i2c_mutex[i2c_num], portMAX_DELAY);
+
     esp_err_t status = i2c_master_write_to_device(i2c_num, ADDR, &data, 1, I2C_DEFAULT_TIMEOUT);
     if(status != ESP_OK)
     {
         ESP_LOGE(TAG, "I2C write failed with status %d", status);
-        return FAILURE;
+        status = FAILURE;
     }
-    ESP_LOGI(TAG, "hal__I2CWRITE_uint8 write at address 0x%02X, register 0x%02X, data 0x%02X", ADDR, REG, data);
-    return SUCCESS;
+    else
+    { 
+        ESP_LOGI(TAG, "hal__I2CWRITE_uint8 write at address 0x%02X, register 0x%02X, data 0x%02X", ADDR, REG, data);
+    }
+    // Release the I2C mutex
+    xSemaphoreGive(i2c_mutex[i2c_num]);
+    return status;
 }
 
 int hal__I2CWRITE(uint8_t i2c_num, uint8_t ADDR, uint8_t REG, uint8_t *data, uint16_t len)
 {
     param_check(i2c_num == 0 || i2c_num == 1);
     //Write data to I2C device at ADDR, register REG. Returns number of bytes written on success, -1 on failure.
+
+    // Acquire the I2C mutex
+    xSemaphoreTake(i2c_mutex[i2c_num], portMAX_DELAY);
+
     esp_err_t status = i2c_master_write_to_device(i2c_num, ADDR, data, len, I2C_DEFAULT_TIMEOUT);
     if(status != ESP_OK)
     {
         ESP_LOGE(TAG, "I2C write failed with status %d", status);
-        return FAILURE;
+        status = FAILURE;
     }
-    ESP_LOGI(TAG, "hal__I2CWRITE write at address 0x%02X, register 0x%02X, data 0x%02X", ADDR, REG, *data);
-    return SUCCESS;
+    else
+    {
+        ESP_LOGI(TAG, "hal__I2CWRITE write at address 0x%02X, register 0x%02X, data 0x%02X", ADDR, REG, *data);
+    }
+    // Release the I2C mutex
+    xSemaphoreGive(i2c_mutex[i2c_num]);
+    return status;
 }
