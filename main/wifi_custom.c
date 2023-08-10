@@ -95,11 +95,22 @@ void sntp_time_init()
     sntp_init();
 }
 
-void smartconfig_init()
+int smartconfig_init()
 {
-    ESP_ERROR_CHECK( esp_smartconfig_set_type(SC_TYPE_ESPTOUCH) );
+    esp_err_t err = esp_smartconfig_set_type(SC_TYPE_ESPTOUCH);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE("wifi_custom", "Smartconfig type set failed with err %d", err);
+        return -1;
+    }
     smartconfig_start_config_t cfg = SMARTCONFIG_START_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK( esp_smartconfig_start(&cfg) );
+    err = esp_smartconfig_start(&cfg);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE("wifi_custom", "Smartconfig start failed with err %d", err);
+        return -1;
+    }
+    return 0;
 }
 
 void wifi_on_connected_cb(void)
@@ -159,10 +170,9 @@ void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_base, in
                 else if(s_retry_num < WIFI_RETRY_CONN_MAX)
                 {
                     ESP_LOGW("wifi_custom", "Start smartconfig to update credentials");
-                    smartconfig_init();
-                    esp_wifi_connect();
-                    s_retry_num++;
                     xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+                    smartconfig_init();
+                    s_retry_num++;
                 }
                 else
                 {
@@ -349,7 +359,7 @@ int wifi_custom__power_on(void)
             WIFI_CONNECTED_BIT | WIFI_FAIL_BIT | ESPTOUCH_GOT_CREDENTIAL,
             pdFALSE,
             pdFALSE,
-            pdMS_TO_TICKS(10000));
+            pdMS_TO_TICKS(15000));
 
     if (bits & WIFI_CONNECTED_BIT || bits & ESPTOUCH_GOT_CREDENTIAL)
     {
@@ -366,7 +376,7 @@ int wifi_custom__power_on(void)
     }
     else
     {
-        ESP_LOGE("wifi_custom", "UNEXPECTED EVENT");
+        ESP_LOGE("wifi_custom", "Timeout to connect");
     }
     return -1;
 } 
