@@ -3,10 +3,11 @@
 /*							 Includes and dependencies						    */
 /*------------------------------------------------------------------------------*/
 #include "hal.h"
-
+#include "esp_log.h"
 /*------------------------------------------------------------------------------*/
 /*					  	   Function prototypes Implement					    */
 /*------------------------------------------------------------------------------*/
+#define TAG "HAL"
 
 /***************************** INIT_HELPER_FUNCTIONS ****************************/
 int hal__init()
@@ -21,6 +22,14 @@ int hal__init()
     {
         ESP_LOGE(TAG, "I2C init failed");
     }
+    
+    ret = __analogInit();
+    if(ret != SUCCESS)
+    {
+        ESP_LOGE(TAG, "ADC init failed");
+    }
+    esp_log_level_set("HAL_ADC", ESP_LOG_ERROR);
+
     ret = wifi_custom_init();
     if(ret != SUCCESS)
     {

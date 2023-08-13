@@ -20,6 +20,7 @@
 #define TEST_WIFI_API          (0)
 #define TEST_GPIO_API          (0)
 #define TEST_I2C_API           (0)
+#define TEST_ADC_API           (1)
 
 void wifi_custom__task(void *pvParameters);
 void gpio_custom__task(void *pvParameters);
@@ -45,12 +46,50 @@ void app_main(void)
     xTaskCreate(&i2c_custom_task, "i2c_custom_task", 4096, NULL, 5, NULL);
 #endif /* End of (TEST_I2C_API == 1) */
 
+#if (TEST_ADC_API == 1)
+    xTaskCreate(&adc_custom_task, "adc_custom_task", 4096, NULL, 5, NULL);
+#endif /* End of (TEST_ADC_API == 1) */ 
 
     while(1)
     {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
+
+#if (TEST_ADC_API != 0)
+void adc_custom_task(void *pvParameters)
+{
+    // Read all ADC pins in ADC1 of ESP32 in format 
+    // RAW ADC: [PIN36_VALUE PIN37_VALUE PIN38_VALUE PIN39_VALUE PIN32_VALUE PIN33_VALUE PIN34_VALUE PIN35_VALUE]   
+    // VOLTAGE: [PIN36_VOLTAGE PIN37_VOLTAGE PIN38_VOLTAGE PIN39_VOLTAGE PIN32_VOLTAGE PIN33_VOLTAGE PIN34_VOLTAGE PIN35_VOLTAGE]
+    while(1)
+    {
+        uint16_t adc_raw[8] = {0};
+        adc_raw[0] = __analogRead(36);
+        adc_raw[1] = __analogRead(37);
+        adc_raw[2] = __analogRead(38);
+        adc_raw[3] = __analogRead(39);
+        adc_raw[4] = __analogRead(32);
+        adc_raw[5] = __analogRead(33);
+        adc_raw[6] = __analogRead(34);
+        adc_raw[7] = __analogRead(35);
+        ESP_LOGI("[test adc]", "RAW: [%d %d %d %d %d %d %d %d]\n", adc_raw[0], adc_raw[1], adc_raw[2], adc_raw[3], adc_raw[4], adc_raw[5], adc_raw[6], adc_raw[7]);
+        uint32_t adc_voltage[8] = {0};
+        adc_voltage[0] = __analogReadMilliVolts(36);
+        adc_voltage[1] = __analogReadMilliVolts(37);
+        adc_voltage[2] = __analogReadMilliVolts(38);
+        adc_voltage[3] = __analogReadMilliVolts(39);
+        adc_voltage[4] = __analogReadMilliVolts(32);
+        adc_voltage[5] = __analogReadMilliVolts(33);
+        adc_voltage[6] = __analogReadMilliVolts(34);
+        adc_voltage[7] = __analogReadMilliVolts(35);
+
+        ESP_LOGI("[test adc]", "mV:[%ld %ld %ld %ld %ld %ld %ld %ld]\n", adc_voltage[0], adc_voltage[1], adc_voltage[2], adc_voltage[3], adc_voltage[4], adc_voltage[5], adc_voltage[6], adc_voltage[7]);
+
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+#endif /* End of (TEST_ADC_API == 1) */
 
 #if (TEST_I2C_API != 0)
 #define DS3231_I2C_ADDR 	0x68

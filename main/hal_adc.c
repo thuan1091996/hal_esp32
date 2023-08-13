@@ -109,9 +109,18 @@ static inline uint16_t mapResolution(uint16_t value)
     return value << (__analogReturnedWidth - from);
 }
 
+
+//todo:
+/*
+- Add ADC
+- Sorry about delay
+- Send code with I2C integrate
+- Test uart
+*/
 int __analogInit()
 {
     static bool initialized = FAILURE;
+    ESP_LOGI(TAG, "ADC init");
     if(initialized)
     {
         return SUCCESS;
@@ -171,6 +180,10 @@ int __analogInit()
     }
 
     initialized = true;
+    // Change log level to error
+    ESP_LOGI(TAG, "ADC init success");
+    esp_log_level_set(TAG, ESP_LOG_ERROR);
+
     return SUCCESS;
 }
 
@@ -272,18 +285,18 @@ uint32_t __analogReadMilliVolts(uint8_t pin){
     if(print_chars_info)
     {
         if (val_type == ESP_ADC_CAL_VAL_EFUSE_TP) {
-            ESP_LOGI(TAG, "ADC%u: Characterized using Two Point Value: %u\n", unit, chars.vref);
+            ESP_LOGI(TAG, "ADC%u: Characterized using Two Point Value: %u\n", (unsigned int)unit, (unsigned int) chars.vref);
         } 
         else if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
-            ESP_LOGI(TAG, "ADC%u: Characterized using eFuse Vref: %u\n", unit, chars.vref);
+            ESP_LOGI(TAG, "ADC%u: Characterized using eFuse Vref: %u\n", (unsigned int)unit, (unsigned int) chars.vref);
         } 
         #if CONFIG_IDF_TARGET_ESP32
         else if(__analogVRef != DEFAULT_VREF){
-            ESP_LOGI(TAG, "ADC%u: Characterized using Vref to GPIO%u: %u\n", unit, __analogVRefPin, chars.vref);
+            ESP_LOGI(TAG, "ADC%u: Characterized using Vref to GPIO%u: %u\n", unit, __analogVRefPin, (unsigned int) chars.vref);
         }
         #endif
         else {
-            ESP_LOGI(TAG, "ADC%u: Characterized using Default Vref: %u\n", unit, chars.vref);
+            ESP_LOGI(TAG, "ADC%u: Characterized using Default Vref: %u\n", (unsigned int)unit, (unsigned int) chars.vref);
         }
         print_chars_info = FAILURE;
     }
