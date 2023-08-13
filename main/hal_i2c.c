@@ -22,6 +22,8 @@
 /******************************************************************************
 * Includes
 *******************************************************************************/
+#include <stdint.h>
+#include <string.h>
 #include "hal.h"
 #include "esp_log.h"
 #include "driver/i2c.h"
@@ -32,8 +34,10 @@
 #define TAG                     "HAL_I2C"
 #define I2C_MASTER_NUM          (0)
 #define I2C_MASTER_FREQ_HZ      (100000)
-#define I2C_SDA_IO              (23)
-#define I2C_SCL_IO              (25)
+#define I2C0_SDA_IO              (23)
+#define I2C0_SCL_IO              (25)
+#define I2C1_SDA_IO              (21)
+#define I2C1_SCL_IO              (22)
 #define I2C_DEFAULT_TIMEOUT     (3000 / portTICK_PERIOD_MS)
 #define I2C_NUM                 (2)
 /******************************************************************************
@@ -63,9 +67,9 @@ int __initI2C0()
     // I2C on pins IO23/IO25
     i2c_config_t conf = {
         .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_SDA_IO,
+        .sda_io_num = I2C0_SDA_IO,
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_io_num = I2C_SCL_IO,
+        .scl_io_num = I2C0_SCL_IO,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
         .master.clk_speed = I2C_MASTER_FREQ_HZ
     };
@@ -84,6 +88,35 @@ int __initI2C0()
     return SUCCESS;
 }
 
+int __initI2C1()
+{
+    esp_err_t status;
+    // I2C on pins IO21/IO22
+    i2c_config_t conf = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = I2C1_SDA_IO,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_io_num = I2C1_SCL_IO,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = I2C_MASTER_FREQ_HZ
+    };
+    status = i2c_param_config(I2C_NUM_1, &conf);
+    if (status != ESP_OK)
+    {
+        ESP_LOGE(TAG, "i2c_param_config failed with status %d", status);
+        return FAILURE;
+    }
+    status = i2c_driver_install(I2C_NUM_1, conf.mode, 0, 0, 0);
+    if (status != ESP_OK)
+    {
+        ESP_LOGE(TAG, "i2c_driver_install failed with status %d", status);
+        return FAILURE;
+    }
+    esp_log_level_set(TAG, ESP_LOG_ERROR);
+    return SUCCESS;
+}
+
+
 // Initialize I2C0 and I2C1. Returns 0 on success, -1 on failure.
 int __initI2C()
 {
@@ -101,6 +134,21 @@ int __initI2C()
         ESP_LOGE(TAG, "Failed to create mutex for I2C0");
         return FAILURE;
     }
+
+    status = __initI2C1();
+    if(status != SUCCESS)
+    {
+        ESP_LOGE(TAG, "Failed to init I2C1");
+        return FAILURE;
+    }
+    // Create mutex for I2C1
+    i2c_mutex[1] = xSemaphoreCreateMutex();
+    if(i2c_mutex[1] == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to create mutex for I2C1");
+        return FAILURE;
+    }
+    
     return SUCCESS;
 }
 
@@ -186,7 +234,9 @@ int hal__I2CWRITE_uint8(uint8_t i2c_num, uint8_t ADDR, uint8_t REG, uint8_t data
     // Acquire the I2C mutex
     xSemaphoreTake(i2c_mutex[i2c_num], portMAX_DELAY);
 
-    esp_err_t status = i2c_master_write_to_device(i2c_num, ADDR, &data, 1, I2C_DEFAULT_TIMEOUT);
+    uint8_t buf[2] = {REG, data};
+
+    esp_err_t status = i2c_master_write_to_device(i2c_num, ADDR, buf, 2, I2C_DEFAULT_TIMEOUT);
     if(status != ESP_OK)
     {
         ESP_LOGE(TAG, "I2C write failed with status %d", status);
@@ -209,7 +259,12 @@ int hal__I2CWRITE(uint8_t i2c_num, uint8_t ADDR, uint8_t REG, uint8_t *data, uin
     // Acquire the I2C mutex
     xSemaphoreTake(i2c_mutex[i2c_num], portMAX_DELAY);
 
-    esp_err_t status = i2c_master_write_to_device(i2c_num, ADDR, data, len, I2C_DEFAULT_TIMEOUT);
+    // Append the register address to the data buffer
+    uint8_t buf[len + 1];
+    buf[0] = REG;
+    memcpy(buf + 1, data, len);
+
+    esp_err_t status = i2c_master_write_to_device(i2c_num, ADDR, buf, len + 1, I2C_DEFAULT_TIMEOUT);
     if(status != ESP_OK)
     {
         ESP_LOGE(TAG, "I2C write failed with status %d", status);
