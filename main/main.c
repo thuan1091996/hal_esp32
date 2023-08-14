@@ -64,29 +64,50 @@ void adc_custom_task(void *pvParameters)
     // VOLTAGE: [PIN36_VOLTAGE PIN37_VOLTAGE PIN38_VOLTAGE PIN39_VOLTAGE PIN32_VOLTAGE PIN33_VOLTAGE PIN34_VOLTAGE PIN35_VOLTAGE]
     while(1)
     {
+
+
         uint16_t adc_raw[8] = {0};
-        adc_raw[0] = __analogRead(36);
-        adc_raw[1] = __analogRead(37);
-        adc_raw[2] = __analogRead(38);
-        adc_raw[3] = __analogRead(39);
-        adc_raw[4] = __analogRead(32);
-        adc_raw[5] = __analogRead(33);
-        adc_raw[6] = __analogRead(34);
-        adc_raw[7] = __analogRead(35);
-        ESP_LOGI("[test adc]", "RAW: [%d %d %d %d %d %d %d %d]\n", adc_raw[0], adc_raw[1], adc_raw[2], adc_raw[3], adc_raw[4], adc_raw[5], adc_raw[6], adc_raw[7]);
         uint32_t adc_voltage[8] = {0};
-        adc_voltage[0] = __analogReadMilliVolts(36);
-        adc_voltage[1] = __analogReadMilliVolts(37);
-        adc_voltage[2] = __analogReadMilliVolts(38);
-        adc_voltage[3] = __analogReadMilliVolts(39);
-        adc_voltage[4] = __analogReadMilliVolts(32);
-        adc_voltage[5] = __analogReadMilliVolts(33);
-        adc_voltage[6] = __analogReadMilliVolts(34);
-        adc_voltage[7] = __analogReadMilliVolts(35);
 
+#if TEST_ADC_PORT1
+
+        adc_raw[0] = hal__ADCRead(36);
+        adc_raw[1] = hal__ADCRead(37);
+        adc_raw[2] = hal__ADCRead(38);
+        adc_raw[3] = hal__ADCRead(39);
+        adc_raw[4] = hal__ADCRead(32);
+        adc_raw[5] = hal__ADCRead(33);
+        adc_raw[6] = hal__ADCRead(34);
+        adc_raw[7] = hal__ADCRead(35);
+        adc_voltage[0] = hal__ADCReadMV(36);
+        adc_voltage[1] = hal__ADCReadMV(37);
+        adc_voltage[2] = hal__ADCReadMV(38);
+        adc_voltage[3] = hal__ADCReadMV(39);
+        adc_voltage[4] = hal__ADCReadMV(32);
+        adc_voltage[5] = hal__ADCReadMV(33);
+        adc_voltage[6] = hal__ADCReadMV(34);
+        adc_voltage[7] = hal__ADCReadMV(35);
+        
+
+        
+#else /* !TEST_ADC_PORT1 */
+        adc_voltage[0] = hal__ADCReadMV(4);
+        adc_voltage[1] = hal__ADCReadMV(0);
+        adc_voltage[2] = hal__ADCReadMV(2);
+        adc_voltage[3] = hal__ADCReadMV(15);
+        adc_voltage[4] = hal__ADCReadMV(13);
+        adc_voltage[5] = hal__ADCReadMV(12);
+        adc_voltage[6] = hal__ADCReadMV(14);
+        adc_voltage[7] = hal__ADCReadMV(27);
+#endif /* End of TEST_ADC_PORT1 */
+        // ESP_LOGI("[test adc]", "RAW: [%d %d %d %d %d %d %d %d]\n", adc_raw[0], adc_raw[1], adc_raw[2], adc_raw[3], adc_raw[4], adc_raw[5], adc_raw[6], adc_raw[7]);
         ESP_LOGI("[test adc]", "mV:[%ld %ld %ld %ld %ld %ld %ld %ld]\n", adc_voltage[0], adc_voltage[1], adc_voltage[2], adc_voltage[3], adc_voltage[4], adc_voltage[5], adc_voltage[6], adc_voltage[7]);
+        // adc_raw[4] = hal__ADCRead(39);
+        // adc_voltage[4] = hal__ADCReadMV(39);
+        // ESP_LOGI("[test adc]", "RAW: [%d] - mV:[%ld]\n", adc_raw[4], adc_voltage[4]);
 
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }
 #endif /* End of (TEST_ADC_API == 1) */
