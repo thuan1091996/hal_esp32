@@ -61,7 +61,7 @@ SemaphoreHandle_t i2c_mutex[I2C_NUM] = {NULL, NULL};
 * Function Definitions
 *******************************************************************************/
 //Initialize I2C. Returns 0 on success, -1 on failure.
-int __initI2C0()
+int __InitI2C0()
 {
     esp_err_t status;
     // I2C on pins IO23/IO25
@@ -88,7 +88,7 @@ int __initI2C0()
     return SUCCESS;
 }
 
-int __initI2C1()
+int __InitI2C1()
 {
     esp_err_t status;
     // I2C on pins IO21/IO22
@@ -118,10 +118,10 @@ int __initI2C1()
 
 
 // Initialize I2C0 and I2C1. Returns 0 on success, -1 on failure.
-int __initI2C()
+int __InitI2C()
 {
     int status = FAILURE;
-    status = __initI2C0();
+    status = __InitI2C0();
     if(status != SUCCESS)
     {
         ESP_LOGE(TAG, "Failed to init I2C0");
@@ -135,7 +135,7 @@ int __initI2C()
         return FAILURE;
     }
 
-    status = __initI2C1();
+    status = __InitI2C1();
     if(status != SUCCESS)
     {
         ESP_LOGE(TAG, "Failed to init I2C1");

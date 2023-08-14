@@ -17,18 +17,17 @@ int hal__init()
     {
         ESP_LOGE(TAG, "UART init failed");
     }
-    ret = __initI2C();
+    ret = __InitI2C();
     if(ret != SUCCESS)
     {
         ESP_LOGE(TAG, "I2C init failed");
     }
     
-    ret = __analogInit();
+    ret = __InitADC();
     if(ret != SUCCESS)
     {
         ESP_LOGE(TAG, "ADC init failed");
     }
-    esp_log_level_set("HAL_ADC", ESP_LOG_ERROR);
 
     ret = wifi_custom_init();
     if(ret != SUCCESS)
