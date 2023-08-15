@@ -33,8 +33,8 @@
 #define MODULE_NAME                         "HAL_UART"
 #define UART_BUFFER_SIZE					(512U)
 
-#define UART_TX1_PIN						(GPIO_NUM_25)
-#define UART_RX1_PIN						(GPIO_NUM_26)
+#define UART_TX1_PIN						(GPIO_NUM_1)
+#define UART_RX1_PIN						(GPIO_NUM_3)
 #define UART_TX2_PIN						(GPIO_NUM_17)
 #define UART_RX2_PIN						(GPIO_NUM_16)
 
