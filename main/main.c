@@ -49,10 +49,18 @@ void app_main(void)
 #if (TEST_ADC_API == 1)
     xTaskCreate(&adc_custom_task, "adc_custom_task", 4096, NULL, 5, NULL);
 #endif /* End of (TEST_ADC_API == 1) */ 
-
+uint8_t greeting_text[]= "Hello World!\n";
     while(1)
     {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // Test PWM APIS with max duty = 1024. 
+        // Duty cycle + 10% each second on pin 26
+        for(uint16_t duty = 0; duty < 1024; duty += 1)
+        {
+            analogWrite(26, duty);
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+        }
+
     }
 }
 
