@@ -1,7 +1,6 @@
 /*******************************************************************************
 * Title                 :   I2C HAL layer for ESP-IDF
 * Filename              :   hal_i2c.c
-* Author                :   ItachiVN
 * Origin Date           :   2023/08/08
 * Version               :   0.0.0
 * Compiler              :   ESP-IDF V5.0.2
@@ -9,12 +8,6 @@
 * Notes                 :   None
 *******************************************************************************/
 
-/*************** MODULE REVISION LOG ******************************************
-*
-*    Date       Software Version	Initials	Description
-*  2023/08/08       0.0.0	         ItachiVN      Module Created.
-*
-*******************************************************************************/
 
 /** \file hal_i2c.c
  *  \brief This module contains the
@@ -33,11 +26,9 @@
 *******************************************************************************/
 #define TAG                     "HAL_I2C"
 #define I2C_MASTER_NUM          (0)
-#define I2C_MASTER_FREQ_HZ      (100000)
-#define I2C0_SDA_IO              (23)
-#define I2C0_SCL_IO              (25)
-#define I2C1_SDA_IO              (21)
-#define I2C1_SCL_IO              (22)
+#define I2C_MASTER_FREQ_HZ      (400000)
+#define I2C0_SDA_IO              (22) 
+#define I2C0_SCL_IO              (23)
 #define I2C_DEFAULT_TIMEOUT     (3000 / portTICK_PERIOD_MS)
 #define I2C_NUM                 (2)
 /******************************************************************************
@@ -71,7 +62,8 @@ int __InitI2C0()
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
         .scl_io_num = I2C0_SCL_IO,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ
+        .master.clk_speed = I2C_MASTER_FREQ_HZ,
+        .clk_flags = 0
     };
     status = i2c_param_config(I2C_NUM_0, &conf);
     if (status != ESP_OK)
@@ -88,7 +80,7 @@ int __InitI2C0()
     return SUCCESS;
 }
 
-int __InitI2C1()
+/*int __InitI2C1()
 {
     esp_err_t status;
     // I2C on pins IO21/IO22
@@ -114,7 +106,7 @@ int __InitI2C1()
     }
     esp_log_level_set(TAG, ESP_LOG_ERROR);
     return SUCCESS;
-}
+}*/
 
 
 // Initialize I2C0 and I2C1. Returns 0 on success, -1 on failure.
@@ -135,7 +127,7 @@ int __InitI2C()
         return FAILURE;
     }
 
-    status = __InitI2C1();
+    /*status = __InitI2C1();
     if(status != SUCCESS)
     {
         ESP_LOGE(TAG, "Failed to init I2C1");
@@ -147,7 +139,7 @@ int __InitI2C()
     {
         ESP_LOGE(TAG, "Failed to create mutex for I2C1");
         return FAILURE;
-    }
+    }*/
     
     return SUCCESS;
 }

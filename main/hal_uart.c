@@ -1,7 +1,6 @@
 /*******************************************************************************
 * Title                 :    
 * Filename              :   hal_uart.c
-* Author                :   
 * Origin Date           :   2023/07/18
 * Version               :   0.0.0
 * Compiler              :   ESP-IDF v5.x
@@ -9,16 +8,6 @@
 * Notes                 :   None
 *******************************************************************************/
 
-/*************** MODULE REVISION LOG ******************************************
-*
-*    Date       Software Version	Initials	Description
-*  2023/07/18       0.0.0	               Module Created.
-*
-*******************************************************************************/
-
-/** \file hal_uart.c
- *  \brief This module contains the
- */
 /******************************************************************************
 * Includes
 *******************************************************************************/
@@ -33,8 +22,8 @@
 #define MODULE_NAME                         "HAL_UART"
 #define UART_BUFFER_SIZE					(512U)
 
-#define UART_TX1_PIN						(GPIO_NUM_25)
-#define UART_RX1_PIN						(GPIO_NUM_26)
+#define UART_TX1_PIN						(GPIO_NUM_3)
+#define UART_RX1_PIN						(GPIO_NUM_1)
 #define UART_TX2_PIN						(GPIO_NUM_17)
 #define UART_RX2_PIN						(GPIO_NUM_16)
 
@@ -57,11 +46,11 @@
 /******************************************************************************
 * Function Definitions
 *******************************************************************************/
-int __initUART1()
+/*int __initUART1()
 {
     int ret = SUCCESS;
 
-    /* Configure parameters of an UART driver */
+    Configure parameters of an UART driver 
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -71,21 +60,21 @@ int __initUART1()
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    /* Set the UART parameters */
+    Set the UART parameters 
     esp_err_t err = uart_param_config(UART_NUM_1, &uart_config);
     if (err != ESP_OK) {
         ESP_LOGE(MODULE_NAME, "Failed to initialize UART1 parameters");
         return FAILURE;
     }
 
-    /* Setup UART IO */
+    Setup UART IO 
     err = uart_set_pin(UART_NUM_1, UART_TX1_PIN, UART_RX1_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (err != ESP_OK) {
         ESP_LOGE(MODULE_NAME, "Failed to set pins for UART1");
         return FAILURE;
     }
 
-	/* Setup UART buffered */
+	Setup UART buffered 
     err = uart_driver_install(UART_NUM_1, UART_BUFFER_SIZE, 0, 0, NULL, 0);
     if (err != ESP_OK) {
         ESP_LOGE(MODULE_NAME, "Failed to install UART1 driver");
@@ -93,7 +82,7 @@ int __initUART1()
     }
 
     return ret;
-}
+}*/
 
 int __initUART2()
 {
@@ -138,15 +127,15 @@ int __InitUART()
 {
     int ret = SUCCESS;
 
-	if(SUCCESS != __initUART1())
+	/*if(SUCCESS != __initUART1())
 	{
 		ESP_LOGE(MODULE_NAME, "Failed to init UART1");
 		return FAILURE;
-	}
+	}*/
 
 	if(SUCCESS != __initUART2())
 	{
-		ESP_LOGE(MODULE_NAME, "Failed to init UART2");
+		printf("Failed to init UART2\n\r");
 		return FAILURE;
 	}
     return ret;
