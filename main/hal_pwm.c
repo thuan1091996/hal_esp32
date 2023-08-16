@@ -31,7 +31,7 @@
 *******************************************************************************/
 #define TAG                     "HAL_PWM"
 
-#define LEDC_DEFAULT_FREQ_HZ    (10000)
+#define LEDC_DEFAULT_FREQ_HZ    (50)
 #define LEDC_DEFAULT_DUTY_MAX   (1024)
 #define LEDC_DEFAULT_BIT_WIDTH  (LEDC_TIMER_10_BIT)
 #define LEDC_CHANNELS           (SOC_LEDC_CHANNEL_NUM)

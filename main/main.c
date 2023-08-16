@@ -73,7 +73,13 @@ uint8_t greeting_text[]= "Hello World!\n";
             {
                 ESP_LOGE("main", "Failed to set duty cycle on pin 33");
             }
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            if(duty == 0)
+                vTaskDelay(3000 / portTICK_PERIOD_MS);      
+            if(duty == 1000)
+                vTaskDelay(3000 / portTICK_PERIOD_MS);      
+            else
+                vTaskDelay(300 / portTICK_PERIOD_MS);
+
         }
     }
 }
