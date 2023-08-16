@@ -21,11 +21,13 @@
 #define TEST_GPIO_API          (0)
 #define TEST_I2C_API           (0)
 #define TEST_ADC_API           (0)
+#define TEST_PWM_API           (0)
 
 void wifi_custom__task(void *pvParameters);
 void gpio_custom__task(void *pvParameters);
 void i2c_custom_task(void *pvParameters);
 void adc_custom_task(void *pvParameters);
+void pwm_custom_task(void *pvParameters);
 
 void app_main(void)
 {
@@ -48,23 +50,37 @@ void app_main(void)
 
 #if (TEST_ADC_API == 1)
     xTaskCreate(&adc_custom_task, "adc_custom_task", 4096, NULL, 5, NULL);
-#endif /* End of (TEST_ADC_API == 1) */ 
+#endif /* End of (TEST_ADC_API == 1) */
+
+#if (TEST_PWM_API == 1)
+    xTaskCreate(&pwm_custom_task, "pwm_custom_task", 4096, NULL, 5, NULL);
+#endif /* End of (TEST_PWM_API == 1) */
+
 uint8_t greeting_text[]= "Hello World!\n";
-        if( hal__setDutyCycle(26, 1500) == FAILURE)
-        {
-            ESP_LOGE("main", "Failed to set duty cycle on pin 26");
-        }
-        if( hal__setDutyCycle(33, 0) == FAILURE)
-        {
-            ESP_LOGE("main", "Failed to set duty cycle on pin 33");
-        }
-        if( hal__setDutyCycle(34, 500) == FAILURE)
-        {
-            ESP_LOGE("main", "Failed to set duty cycle on pin 34");
-        }
+
     while(1)
     {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+#if (TEST_PWM_API != 0)
+void pwm_custom_task(void *pvParameters)
+{
+    if( hal__setDutyCycle(26, 1500) == FAILURE)
+    {
+        ESP_LOGE("main", "Failed to set duty cycle on pin 26");
+    }
+    if( hal__setDutyCycle(33, 0) == FAILURE)
+    {
+        ESP_LOGE("main", "Failed to set duty cycle on pin 33");
+    }
+    if( hal__setDutyCycle(34, 500) == FAILURE)
+    {
+        ESP_LOGE("main", "Failed to set duty cycle on pin 34");
+    }
+    while(1)
+    {
         // Test PWM APIS with max duty = 1024. 
         // Duty cycle + 10% each second on pin 33
         for(uint16_t duty = 0; duty <= 1000; duty += 10)
@@ -79,10 +95,11 @@ uint8_t greeting_text[]= "Hello World!\n";
                 vTaskDelay(3000 / portTICK_PERIOD_MS);      
             else
                 vTaskDelay(300 / portTICK_PERIOD_MS);
-
         }
     }
+
 }
+#endif /* End of (TEST_PWM_API == 1) */
 
 #if (TEST_ADC_API != 0)
 #define TEST_ADC_PORT1  0
