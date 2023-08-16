@@ -50,17 +50,31 @@ void app_main(void)
     xTaskCreate(&adc_custom_task, "adc_custom_task", 4096, NULL, 5, NULL);
 #endif /* End of (TEST_ADC_API == 1) */ 
 uint8_t greeting_text[]= "Hello World!\n";
+        if( hal__setDutyCycle(26, 1500) == FAILURE)
+        {
+            ESP_LOGE("main", "Failed to set duty cycle on pin 26");
+        }
+        if( hal__setDutyCycle(33, 0) == FAILURE)
+        {
+            ESP_LOGE("main", "Failed to set duty cycle on pin 33");
+        }
+        if( hal__setDutyCycle(34, 500) == FAILURE)
+        {
+            ESP_LOGE("main", "Failed to set duty cycle on pin 34");
+        }
     while(1)
     {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         // Test PWM APIS with max duty = 1024. 
-        // Duty cycle + 10% each second on pin 26
-        for(uint16_t duty = 0; duty < 1024; duty += 1)
+        // Duty cycle + 10% each second on pin 33
+        for(uint16_t duty = 0; duty <= 1000; duty += 10)
         {
-            analogWrite(26, duty);
-            vTaskDelay(10 / portTICK_PERIOD_MS);
+            if( hal__setDutyCycle(33, duty) == FAILURE)
+            {
+                ESP_LOGE("main", "Failed to set duty cycle on pin 33");
+            }
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
         }
-
     }
 }
 

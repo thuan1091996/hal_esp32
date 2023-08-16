@@ -24,7 +24,7 @@
 *******************************************************************************/
 #include "esp_log.h"
 #include "driver/ledc.h"
-
+#include "driver/gpio.h"
 #include "hal.h"
 /******************************************************************************
 * Module Preprocessor Constants
@@ -32,7 +32,7 @@
 #define TAG                     "HAL_PWM"
 
 #define LEDC_DEFAULT_FREQ_HZ    (10000)
-#define LEDC_DEFAULT_DUTY_MAX   (1023)
+#define LEDC_DEFAULT_DUTY_MAX   (1024)
 #define LEDC_DEFAULT_BIT_WIDTH  (LEDC_TIMER_10_BIT)
 #define LEDC_CHANNELS           (SOC_LEDC_CHANNEL_NUM)
 #define LEDC_DEFAULT_CLK        (LEDC_AUTO_CLK)
@@ -158,33 +158,43 @@ static void ledcWrite(uint8_t chan, uint32_t duty)
     ledc_update_duty(group, channel);
 }
 
-static int8_t analogGetChannel(uint8_t pin) {
+static int8_t __analogGetChannel(uint8_t pin) {
     return pin_to_channel[pin];
 }
 
-void analogWrite(uint8_t pin, int value) {
+//Set Duty Cycle, in tenths of percent. For Example, Passing (1, 50) will set Timer 1 Channel 1 to 5.0%. Returns 0 on success, -1 on failure.
+int hal__setDutyCycle(uint8_t pin, uint16_t dutyCycle_tenth)
+{
     // Use ledc hardware for internal pins
-    if (pin < SOC_GPIO_PIN_COUNT) {
-        int8_t channel = -1;
-        if (pin_to_channel[pin] == 0) {
-            if (!cnt_channel) {
-                ESP_LOGE(TAG, "No more analogWrite channels available! You can have maximum %d", LEDC_CHANNELS);
-                return;
-            }
-            cnt_channel--;
-            channel = cnt_channel;
-        } else {
-            channel = analogGetChannel(pin);
+    param_check(GPIO_IS_VALID_OUTPUT_GPIO(pin));
+    param_check(dutyCycle_tenth <= 1000 && dutyCycle_tenth >= 0);
+    int8_t channel = -1;
+    if (pin_to_channel[pin] == 0)
+    {
+        if (!cnt_channel)
+        {
+            ESP_LOGE(TAG, "No more analogWrite channels available! You can have maximum %d", LEDC_CHANNELS);
+            return FAILURE;
         }
-        ESP_LOGI(TAG, "GPIO %d - Using Channel %d, Value = %d", pin, channel, value);
-        if(ledcSetup(channel, LEDC_DEFAULT_FREQ_HZ, LEDC_DEFAULT_BIT_WIDTH) == 0){
-            ESP_LOGE(TAG, "analogWrite setup failed (freq = %u, resolution = %u). Try setting different resolution or frequency", LEDC_DEFAULT_FREQ_HZ, LEDC_DEFAULT_BIT_WIDTH);
-            return;
-        }
-        ledcAttachPin(pin, channel);
-        pin_to_channel[pin] = channel;
-        ledcWrite(channel, value);
+        cnt_channel--;
+        channel = cnt_channel;
     }
+    else
+    {
+        channel = __analogGetChannel(pin);
+    }
+    ESP_LOGI(TAG, "GPIO %d - Using Channel %d, Value = %d", pin, channel, dutyCycle_tenth);
+    if (ledcSetup(channel, LEDC_DEFAULT_FREQ_HZ, LEDC_DEFAULT_BIT_WIDTH) == 0)
+    {
+        ESP_LOGE(TAG, "analogWrite setup failed (freq = %u, resolution = %u). Try setting different resolution or frequency", LEDC_DEFAULT_FREQ_HZ, LEDC_DEFAULT_BIT_WIDTH);
+        return FAILURE;
+    }
+    ledcAttachPin(pin, channel);
+    pin_to_channel[pin] = channel;
+    // Convert from [0 LEDC_DEFAULT_DUTY_MAX] -> [0 1000]
+    dutyCycle_tenth = (dutyCycle_tenth * LEDC_DEFAULT_DUTY_MAX) / 1000;
+    ledcWrite(channel, dutyCycle_tenth);
+    return SUCCESS;
 }
 
 /******************************************************************************
