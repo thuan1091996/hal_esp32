@@ -153,7 +153,7 @@ int hal__ADCRead(uint8_t pin)
         return FAILURE;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(500));
+    vTaskDelay(pdMS_TO_TICKS(100));
     int adc_raw;
     //Read ADC value
     if(ESP_OK != adc_oneshot_read(adc_handle[adc_port], adc_channel, &adc_raw))

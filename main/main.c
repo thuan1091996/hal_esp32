@@ -20,7 +20,7 @@
 #define TEST_WIFI_API          (0)
 #define TEST_GPIO_API          (0)
 #define TEST_I2C_API           (0)
-#define TEST_ADC_API           (1)
+#define TEST_ADC_API           (0)
 
 void wifi_custom__task(void *pvParameters);
 void gpio_custom__task(void *pvParameters);
@@ -65,6 +65,8 @@ uint8_t greeting_text[]= "Hello World!\n";
 }
 
 #if (TEST_ADC_API != 0)
+#define TEST_ADC_PORT1  0
+#define TEST_ADC_PORT2  1
 void adc_custom_task(void *pvParameters)
 {
     // Read all ADC pins in ADC1 of ESP32 in format 
@@ -77,7 +79,7 @@ void adc_custom_task(void *pvParameters)
         uint16_t adc_raw[8] = {0};
         uint32_t adc_voltage[8] = {0};
 
-#if TEST_ADC_PORT1
+#if (TEST_ADC_PORT1 != 0)
 
         adc_raw[0] = hal__ADCRead(36);
         adc_raw[1] = hal__ADCRead(37);
@@ -95,10 +97,11 @@ void adc_custom_task(void *pvParameters)
         adc_voltage[5] = hal__ADCReadMV(33);
         adc_voltage[6] = hal__ADCReadMV(34);
         adc_voltage[7] = hal__ADCReadMV(35);
-        
+        ESP_LOGI("[test adc]", "ADC1 mV:[%ld %ld %ld %ld %ld %ld %ld %ld]\n", adc_voltage[0], adc_voltage[1], adc_voltage[2], adc_voltage[3], adc_voltage[4], adc_voltage[5], adc_voltage[6], adc_voltage[7]);
 
-        
-#else /* !TEST_ADC_PORT1 */
+#endif /* End of (TEST_ADC_PORT1 != 0) */
+
+#if (TEST_ADC_PORT2 != 0)
         adc_voltage[0] = hal__ADCReadMV(4);
         adc_voltage[1] = hal__ADCReadMV(0);
         adc_voltage[2] = hal__ADCReadMV(2);
@@ -107,15 +110,14 @@ void adc_custom_task(void *pvParameters)
         adc_voltage[5] = hal__ADCReadMV(12);
         adc_voltage[6] = hal__ADCReadMV(14);
         adc_voltage[7] = hal__ADCReadMV(27);
-#endif /* End of TEST_ADC_PORT1 */
         // ESP_LOGI("[test adc]", "RAW: [%d %d %d %d %d %d %d %d]\n", adc_raw[0], adc_raw[1], adc_raw[2], adc_raw[3], adc_raw[4], adc_raw[5], adc_raw[6], adc_raw[7]);
-        ESP_LOGI("[test adc]", "mV:[%ld %ld %ld %ld %ld %ld %ld %ld]\n", adc_voltage[0], adc_voltage[1], adc_voltage[2], adc_voltage[3], adc_voltage[4], adc_voltage[5], adc_voltage[6], adc_voltage[7]);
+        ESP_LOGI("[test adc2]", "ADC2 mV:[%ld %ld %ld %ld %ld %ld %ld %ld]\n", adc_voltage[0], adc_voltage[1], adc_voltage[2], adc_voltage[3], adc_voltage[4], adc_voltage[5], adc_voltage[6], adc_voltage[7]);
         // adc_raw[4] = hal__ADCRead(39);
         // adc_voltage[4] = hal__ADCReadMV(39);
         // ESP_LOGI("[test adc]", "RAW: [%d] - mV:[%ld]\n", adc_raw[4], adc_voltage[4]);
+#endif /* (TEST_ADC_PORT2 != 0) */
 
-
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(300 / portTICK_PERIOD_MS);
     }
 }
 #endif /* End of (TEST_ADC_API == 1) */
