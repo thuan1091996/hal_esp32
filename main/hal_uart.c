@@ -46,11 +46,11 @@
 /******************************************************************************
 * Function Definitions
 *******************************************************************************/
-/*int __initUART1()
+int __initUART1()
 {
     int ret = SUCCESS;
 
-    Configure parameters of an UART driver 
+    /* Configure parameters of an UART driver */
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -60,21 +60,21 @@
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    Set the UART parameters 
+    /* Set the UART parameters */
     esp_err_t err = uart_param_config(UART_NUM_1, &uart_config);
     if (err != ESP_OK) {
         ESP_LOGE(MODULE_NAME, "Failed to initialize UART1 parameters");
         return FAILURE;
     }
 
-    Setup UART IO 
+    /* Setup UART IO */
     err = uart_set_pin(UART_NUM_1, UART_TX1_PIN, UART_RX1_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (err != ESP_OK) {
         ESP_LOGE(MODULE_NAME, "Failed to set pins for UART1");
         return FAILURE;
     }
 
-	Setup UART buffered 
+	/* Setup UART buffered */
     err = uart_driver_install(UART_NUM_1, UART_BUFFER_SIZE, 0, 0, NULL, 0);
     if (err != ESP_OK) {
         ESP_LOGE(MODULE_NAME, "Failed to install UART1 driver");
@@ -82,7 +82,7 @@
     }
 
     return ret;
-}*/
+}
 
 int __initUART2()
 {
@@ -127,15 +127,17 @@ int __InitUART()
 {
     int ret = SUCCESS;
 
-	/*if(SUCCESS != __initUART1())
+	/*
+    if(SUCCESS != __initUART1())
 	{
 		ESP_LOGE(MODULE_NAME, "Failed to init UART1");
 		return FAILURE;
-	}*/
+	}
+    */
 
 	if(SUCCESS != __initUART2())
 	{
-		printf("Failed to init UART2\n\r");
+		ESP_LOGE(MODULE_NAME, "Failed to init UART2");
 		return FAILURE;
 	}
     return ret;
