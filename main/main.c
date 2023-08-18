@@ -17,13 +17,15 @@
 #include "hal.h"
 #include "nrf_slte.h"
 
-#define TEST_WIFI_API          (0)
+#define TEST_WIFI_API          (1)
+#define TEST_WIFI_HTTP         (1)
 #define TEST_GPIO_API          (0)
 #define TEST_I2C_API           (0)
 #define TEST_ADC_API           (0)
 #define TEST_PWM_API           (0)
 
 void wifi_custom__task(void *pvParameters);
+void wifi_custom_http__task(void *pvParameters);
 void gpio_custom__task(void *pvParameters);
 void i2c_custom_task(void *pvParameters);
 void adc_custom_task(void *pvParameters);
@@ -36,9 +38,11 @@ void app_main(void)
         ESP_LOGE("main", "Failed to init HAL");
     }
 
-#if (TEST_WIFI_API == 1)
+#if ( (TEST_WIFI_API == 1) && (TEST_WIFI_HTTP == 0) )
     xTaskCreate(&wifi_custom__task, "wifi_custom__task", 4096, NULL, 5, NULL);
-#endif /* End of (TEST_WIFI_API == 1) */
+#elif ( (TEST_WIFI_API == 1) && (TEST_WIFI_HTTP == 1) )
+    xTaskCreate(&wifi_custom_http__task, "wifi_http__task", 1024*8, NULL, 5, NULL);
+#endif /* End of (TEST_WIFI_HTTP == 1) */
 
 #if (TEST_GPIO_API == 1)
     xTaskCreate(&gpio_custom__task, "gpio_custom__task", 4096, NULL, 5, NULL);
@@ -305,7 +309,6 @@ void i2c_custom_task(void *pvParameters)
 #if (TEST_WIFI_API == 1)
 void wifi_custom__task(void *pvParameters)
 {
-    wifi_custom__printCA();
     while(1)
     {
         wifi_custom__power_on();
@@ -320,6 +323,7 @@ void wifi_custom__task(void *pvParameters)
 
     }
 }
+
 #endif /* End of (TEST_WIFI_API == 1) */
 
 #if (TEST_GPIO_API == 1)
