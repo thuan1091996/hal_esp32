@@ -73,6 +73,9 @@ int hal__I2CWRITE(uint8_t i2c_num, uint8_t ADDR, uint8_t REG, uint8_t *data, uin
 int hal__ADCRead(uint8_t pin);
 int hal__ADCReadMV(uint8_t pin);
 
+/* Common functions */
+int hal__getStackSize(void); //Returns the stack size of the current task. Returns current stack size on success, -1 on failure.
+
 #ifdef __cplusplus
 }
 #endif

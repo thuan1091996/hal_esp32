@@ -182,6 +182,13 @@ int mailbox__flush(at_resp_data_mailbox_t* mailbox)
     return SUCCESS;
 }
 
+//Returns the stack size of the current task. Returns current stack size on success, -1 on failure.
+int hal__getStackSize(void)
+{
+    UBaseType_t remaining_stack =  uxTaskGetStackHighWaterMark(NULL);
+    SIM7600_PRINTF("Remaining stack: %dB", remaining_stack);
+    return remaining_stack;
+}
 /******************************************************************************
 * Internal Function Prototypes
 *******************************************************************************/
