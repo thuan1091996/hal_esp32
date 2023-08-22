@@ -28,7 +28,6 @@
 
 #define PORT_DELAY_MS(MS)               (vTaskDelay(MS / portTICK_PERIOD_MS))
 #define PORT_GET_SYSTIME_MS()           (xTaskGetTickCount() * portTICK_PERIOD_MS)
-#endif /* End of (TEST_NATIVE_HOST == 1) */
 
 //TODO: Remove __sim7600_ -> __sim7600_, sim7600__ -> sim7600__, SIM7600_PRINTF -> SIM7600_PRINTF
 
@@ -254,7 +253,11 @@ int __sim7600__get_http_content_len(const char* resp)
     char* content_length_str = strstr(resp, "Content-Length: ");
     if(content_length_str == NULL)
         return FAILURE; // Invalid response
-    sscanf(content_length_str, "Content-Length: %d", &content_length);
+    if (sscanf(content_length_str, "Content-Length: %d", &content_length) != 1)
+    {
+        SIM7600_PRINTF("Invalid response\n");
+        return FAILURE; // Invalid response
+    }
     return content_length;
 }
 
@@ -410,7 +413,7 @@ int sim7600__power_off(void)
     cur_func_mode_str = strtok(cur_func_mode_str, "\n");
     if(cur_func_mode_str == NULL)
         return FAILURE; // Invalid response 
-    if(sscanf(cur_func_mode_str, "+CFUN: %d", &cur_func_mode) != 1)
+    if(sscanf(cur_func_mode_str, "+CFUN: %d ", &cur_func_mode) != 1)
         return FAILURE; // Invalid response
     
     if(cur_func_mode == 0)
@@ -669,7 +672,11 @@ int __sim7600_httpsGET_send_req(char* url)
     if(response_data == NULL)
         return FAILURE; // Invalid response
 
-    sscanf(response_data, "#XHTTPCCON: %d", &status);
+    if (sscanf(response_data, "#XHTTPCCON: %d", &status) != 1)
+    {
+        SIM7600_PRINTF("Invalid response\n");
+        return FAILURE; // Invalid response
+    }
     if(status != 1)
         return FAILURE; // Failed to connect to server
 
@@ -687,7 +694,12 @@ int __sim7600_httpsGET_send_req(char* url)
     response_data = strstr(resp, "XHTTPCREQ");
     if(response_data == NULL)
     	return FAILURE;
-    sscanf(response_data, "XHTTPCREQ: %d", &status);
+    if (sscanf(response_data, "XHTTPCREQ: %d", &status) != 1)
+    {
+        SIM7600_PRINTF("Invalid response\n");
+        return FAILURE; // Invalid response
+    }
+
     if(status < 0)
         return FAILURE; // Failed to send request
     
@@ -729,7 +741,12 @@ int __sim7600_httpsPOST_send_req(char* url, char* JSONdata, char* agent)
     if(response_data == NULL)
         return FAILURE; // Invalid response
 
-    sscanf(response_data, "#XHTTPCCON: %d", &status);
+    if (sscanf(response_data, "#XHTTPCCON: %d", &status) != 1)
+    {
+        SIM7600_PRINTF("Invalid response\n");
+        return FAILURE; // Invalid response
+    }
+
     if(status != 1)
         return FAILURE; // Failed to connect to server
 
@@ -746,7 +763,11 @@ int __sim7600_httpsPOST_send_req(char* url, char* JSONdata, char* agent)
     response_data = strstr(resp, "XHTTPCREQ");
     if(response_data == NULL)
         return FAILURE;
-    sscanf(response_data, "XHTTPCREQ: %d", &status);
+    if(sscanf(response_data, "XHTTPCREQ: %d", &status) != 1)
+    {
+        SIM7600_PRINTF("Invalid response\n");
+        return FAILURE; // Invalid response
+    }
     if(status < 0)
         return FAILURE; // Failed to send request
     
