@@ -17,12 +17,13 @@
 #include "hal.h"
 #include "nrf_slte.h"
 
-#define TEST_WIFI_API          (1)
-#define TEST_WIFI_HTTP         (1)
+#define TEST_WIFI_API          (0)
+#define TEST_WIFI_HTTP         (0)
 #define TEST_GPIO_API          (0)
 #define TEST_I2C_API           (0)
 #define TEST_ADC_API           (0)
 #define TEST_PWM_API           (0)
+#define TEST_LTE_MODEM_API     (1)
 
 void wifi_custom__task(void *pvParameters);
 void wifi_custom_http__task(void *pvParameters);
@@ -30,6 +31,7 @@ void gpio_custom__task(void *pvParameters);
 void i2c_custom_task(void *pvParameters);
 void adc_custom_task(void *pvParameters);
 void pwm_custom_task(void *pvParameters);
+void lte_modem_custom_task(void *pvParameters);
 
 void app_main(void)
 {
@@ -60,7 +62,9 @@ void app_main(void)
     xTaskCreate(&pwm_custom_task, "pwm_custom_task", 4096, NULL, 5, NULL);
 #endif /* End of (TEST_PWM_API == 1) */
 
-uint8_t greeting_text[]= "Hello World!\n";
+#if (TEST_LTE_MODEM_API == 1)
+    xTaskCreate(&lte_modem_custom_task, "lte_modem_custom_task", 10*1024, NULL, 5, NULL);
+#endif /* End of (TEST_LTE_MODEM_API == 1) */
 
     while(1)
     {
