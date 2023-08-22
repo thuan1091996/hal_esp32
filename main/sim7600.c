@@ -24,7 +24,7 @@
 * Module configurations
 *******************************************************************************/
 #define TEST_NATIVE_HOST                (0) /* Set 1 to test on native host machine */
-#define TEST_USED_SAMPLE_HTTP_RESP      (0) /* Set to 1 overwrite response data with HTTP_RESP_EXAMPLE[] */
+#define TEST_USED_SAMPLE_HTTP_RESP      (1) /* Set to 1 overwrite response data with HTTP_RESP_EXAMPLE[] */
 #define TEST_AT_DEBUG_PRINTF            (1) /* Set to 1 to print log msg using printf()*/     
 
 #if (TEST_NATIVE_HOST == 1)
@@ -32,7 +32,7 @@
 #define SUCCESS                         (0)
 #define FAILURE                         (-1)
 
-#define PORT_DELAY_MS(MS)               _sleep(MS)      
+#define PORT_DELAY_MS(MS)               _sleep(MS)
 #define PORT_GET_SYSTIME_MS()           clock()
 #define param_check(param)	            assert(param)   
 
@@ -42,7 +42,7 @@
 #define PORT_GET_SYSTIME_MS()           (xTaskGetTickCount() * portTICK_PERIOD_MS)
 #endif /* End of (TEST_NATIVE_HOST == 1) */
 
-//TODO: __nrf_slte_ -> __nrf_slte_, nrf_slte__ -> nrf_slte__, NRF_SLM_PRINTF -> NRF_SLM_PRINTF
+//TODO: Remove __sim7600_ -> __sim7600_, sim7600__ -> sim7600__, NRF_SLM_PRINTF -> NRF_SLM_PRINTF
 
 /******************************************************************************
 * Module Preprocessor Macros
@@ -185,17 +185,17 @@ int mailbox__flush(at_resp_data_mailbox_t* mailbox)
 /******************************************************************************
 * Internal Function Prototypes
 *******************************************************************************/
-int __nrf_slte__send_command(char* command);
-int __nrf_slte__wait_4response(char *expected_resp, uint16_t timeout_ms);
-int __nrf_slte__get_resp(char* resp, uint16_t maxlength);
-int __nrf_slte__clearCert();
+int __sim7600__send_command(char* command);
+int __sim7600__wait_4response(char *expected_resp, uint16_t timeout_ms);
+int __sim7600__get_resp(char* resp, uint16_t maxlength);
+int __sim7600__clearCert();
 
-int __nrf_slte__cal_rssi_from_cesq(char* cesq_response);
-int __nrf_slte__get_http_content_len(const char* resp);
+int __sim7600__cal_rssi_from_cesq(char* cesq_response);
+int __sim7600__get_http_content_len(const char* resp);
 
-int __nrf_slte_httpsGET_send_req(char* url);
-int __nrf_slte_httpsPOST_send_req(char* url, char* JSONdata, char* agent);
-int __nrf_slte_https_parse_resp(char* resp_input, char* response_header, int header_max_size, char* response_body, int body_max_size);
+int __sim7600_httpsGET_send_req(char* url);
+int __sim7600_httpsPOST_send_req(char* url, char* JSONdata, char* agent);
+int __sim7600_https_parse_resp(char* resp_input, char* response_header, int header_max_size, char* response_body, int body_max_size);
 /******************************************************************************
 * Internal Function Definitions
 *******************************************************************************/
@@ -205,7 +205,7 @@ int __nrf_slte_https_parse_resp(char* resp_input, char* response_header, int hea
  * @return RSSI in dBm
  * @note: More on: https://devzone.nordicsemi.com/f/nordic-q-a/71958/how-know-rssi
  */
-int __nrf_slte__cal_rssi_from_cesq(char* cesq_response) 
+int __sim7600__cal_rssi_from_cesq(char* cesq_response) 
 {
     param_check(cesq_response != NULL);
     int rsrq, rsrp, rssi;
@@ -224,7 +224,7 @@ int __nrf_slte__cal_rssi_from_cesq(char* cesq_response)
  * @param datetime 
  * @return FAILURE if error, else unix timestamp in seconds
  */
-long __nrf_slte__get_unix_timestamp(const char* datetime)
+long __sim7600__get_unix_timestamp(const char* datetime)
 {
     int year, month, day, hour, minute, second;
     param_check(datetime != NULL);
@@ -260,7 +260,7 @@ long __nrf_slte__get_unix_timestamp(const char* datetime)
  * @param host 
  * @param path 
  */
-int __nrf_slte__parse_url(const char* url, char* host, char* path)
+int __sim7600__parse_url(const char* url, char* host, char* path)
 {
     param_check(url != NULL);
     param_check(host != NULL);
@@ -292,7 +292,7 @@ int __nrf_slte__parse_url(const char* url, char* host, char* path)
  * @param resp: The response header from the server 
  * @return int: The content length of the response body
  */
-int __nrf_slte__get_http_content_len(const char* resp)
+int __sim7600__get_http_content_len(const char* resp)
 {
     param_check(resp != NULL);
     int content_length;
@@ -304,14 +304,22 @@ int __nrf_slte__get_http_content_len(const char* resp)
 }
 
 
-int __nrf_slte__send_command(char* command)
+int __sim7600__send_command(char* command)
 {
     param_check(command != NULL);
     mailbox__flush(&at_rx_data);        //Clear AT RX buffer before sending command
     return hal__UARTWrite(AT_DEFAULT_UART_PORT, (uint8_t*) command, strnlen(command, AT_BUFFER_SIZE));
 }
 
-int __nrf_slte__wait_4response(char* expected_resp, uint16_t timeout_ms)
+/**
+ * @brief Waits for a response from the LTE modem and checks if it matches the expected response.
+ * 
+ * @param expected_resp The expected response from the SIM7600 module.
+ * @param timeout_ms The maximum time to wait for the response in milliseconds.
+ * @return int Returns SUCCESS if the expected response is received within the timeout period, otherwise returns FAILURE.
+ */
+
+int __sim7600__wait_4response(char* expected_resp, uint16_t timeout_ms)
 {
     uint8_t rcv_buf[AT_BUFFER_SIZE] = {0};  // Temp buffer to receive data from UART
     uint16_t recv_idx = 0;
@@ -343,7 +351,7 @@ int __nrf_slte__wait_4response(char* expected_resp, uint16_t timeout_ms)
 }
 
 
-int __nrf_slte__get_resp(char* resp, uint16_t maxlength)
+int __sim7600__get_resp(char* resp, uint16_t maxlength)
 {
     param_check(resp != NULL);
     uint16_t cur_len = mailbox__get_len(&at_rx_data);
@@ -355,32 +363,32 @@ int __nrf_slte__get_resp(char* resp, uint16_t maxlength)
     return cur_len;
 }
 
-int __nrf_slte__clearCert()
+int __sim7600__clearCert()
 {
-    if (__nrf_slte__send_command("AT+CFUN=4\r\n") != SUCCESS)
+    if (__sim7600__send_command("AT+CFUN=4\r\n") != SUCCESS)
         return FAILURE; // Failed to send command
 
-    if (__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
     // Check (list) to see if cert exists
-    if (__nrf_slte__send_command("AT%CMNG=1,12354,0\r\n") != SUCCESS)
+    if (__sim7600__send_command("AT%CMNG=1,12354,0\r\n") != SUCCESS)
         return FAILURE; // Failed to send command
 
-    if (__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
     char resp[AT_BUFFER_SIZE] = {0};
-    int resp_len = __nrf_slte__get_resp(resp, AT_BUFFER_SIZE);
+    int resp_len = __sim7600__get_resp(resp, AT_BUFFER_SIZE);
     char* cert_str = strstr(resp, "%CMNG: 12354, 0");
     if(cert_str == NULL)
         return SUCCESS; // Cert does not exist, return success
     else
     {
-        if (__nrf_slte__send_command("AT%CMNG=3,12354,0\r\n") != SUCCESS)
+        if (__sim7600__send_command("AT%CMNG=3,12354,0\r\n") != SUCCESS)
             return FAILURE; // Failed to send command
 
-        if (__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+        if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
             return FAILURE; // Failed to receive resp (no "OK" received within timeout")
     }
     return SUCCESS;
@@ -390,15 +398,15 @@ int __nrf_slte__clearCert()
 * Function Definitions
 *******************************************************************************/
 /*
- *  Implements [AT+CFUN=21] (Enables LTE modem.)
+ *  Implements [AT+CFUN=1] (Enables LTE modem.)
  *  Waits for "OK" response. Returns SUCCESS if ok. Returns FAILURE if error.
  */
-int nrf_slte__power_on(void)
+int sim7600__power_on(void)
 {
-    if (__nrf_slte__send_command("AT+CFUN=1\r\n") != SUCCESS)
+    if (__sim7600__send_command("AT+CFUN=1\r\n") != SUCCESS)
         return FAILURE; // Failed to send command
 
-    if (__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
     return SUCCESS;
@@ -408,17 +416,17 @@ int nrf_slte__power_on(void)
  * Implements [AT+CFUN=0] (Disables LTE modem.)
  * Waits for "OK" response. Returns SUCCESS if ok. Returns FAILURE if error.
  */
-int nrf_slte__power_off(void)
+int sim7600__power_off(void)
 {
     // CFUN=0 causes writing to NVM. When using CFUN=0, take NVM wear into account
     //  => Ready curent mode first to avoid unnecessary NVM writes  
-    if (__nrf_slte__send_command("AT+CFUN?\r\n") != SUCCESS)
+    if (__sim7600__send_command("AT+CFUN?\r\n") != SUCCESS)
         return FAILURE; // Failed to send command
-    if (__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
     char resp[AT_BUFFER_SIZE] = {0};
-    int resp_len = __nrf_slte__get_resp(resp, AT_BUFFER_SIZE);
+    int resp_len = __sim7600__get_resp(resp, AT_BUFFER_SIZE);
 
     int cur_func_mode;
     char* cur_func_mode_str = strstr(resp, "+CFUN: ");
@@ -437,9 +445,9 @@ int nrf_slte__power_off(void)
 
     else 
     {
-        if (__nrf_slte__send_command("AT+CFUN=0\r\n") != SUCCESS)
+        if (__sim7600__send_command("AT+CFUN=0\r\n") != SUCCESS)
             return FAILURE; // Failed to send command
-        if (__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+        if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
             return FAILURE; // Failed to receive resp (no "OK" received within timeout")
     }
     return SUCCESS;
@@ -452,16 +460,16 @@ int nrf_slte__power_off(void)
  * "AT+CESQ"
  * "+CESQ: 99,99,255,255,31,62 <CR><LF> OK"
  */
-int nrf_slte__get_rssi(void)
+int sim7600__get_rssi(void)
 {
-    if (__nrf_slte__send_command("AT+CESQ\r\n") != SUCCESS)
+    if (__sim7600__send_command("AT+CESQ\r\n") != SUCCESS)
         return FAILURE; // Failed to send command
     
-    if (__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
     char resp[AT_BUFFER_SIZE] = {0};
-    int resp_len = __nrf_slte__get_resp(resp, AT_BUFFER_SIZE);
+    int resp_len = __sim7600__get_resp(resp, AT_BUFFER_SIZE);
 
     char* cesq_response_str = strstr(resp, "+CESQ: ");
     if(cesq_response_str == NULL)
@@ -472,7 +480,7 @@ int nrf_slte__get_rssi(void)
     if(cesq_response_str == NULL)
         return FAILURE; // Invalid response
     
-    int rssi = __nrf_slte__cal_rssi_from_cesq(cesq_response_str);
+    int rssi = __sim7600__cal_rssi_from_cesq(cesq_response_str);
 
     return rssi;
 }
@@ -484,16 +492,16 @@ int nrf_slte__get_rssi(void)
  * returns 1 if connected, 0 if not connected, -1 if error 
  * //https://infocenter.nordicsemi.com/topic/ref_at_commands/REF/at_commands/nw_service/cops_read.html
  */
-int nrf_slte__connected(void)
+int sim7600__connected(void)
 {
-    if (__nrf_slte__send_command("AT+COPS?\r\n") != SUCCESS)
+    if (__sim7600__send_command("AT+COPS?\r\n") != SUCCESS)
         return FAILURE; // Failed to send command
 
-    if (__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
     char resp[AT_BUFFER_SIZE] = {0};
-    int resp_len = __nrf_slte__get_resp(resp, AT_BUFFER_SIZE);
+    int resp_len = __sim7600__get_resp(resp, AT_BUFFER_SIZE);
 
     char* cops_response_str = strstr(resp, "ERROR");
     if(cops_response_str != NULL)
@@ -520,12 +528,12 @@ int nrf_slte__connected(void)
  * Send +CPIN=? 
  * returns 1 if SIM is present (Resp == "READY"), 0 if not present (???), -1 if error
  */
-int nrf_slte__get_SimPresent(void)
+int sim7600__get_SimPresent(void)
 {
-    if (__nrf_slte__send_command("AT+CPIN?\r\n") != SUCCESS)
+    if (__sim7600__send_command("AT+CPIN?\r\n") != SUCCESS)
         return FAILURE; // Failed to send command
 
-    if (__nrf_slte__wait_4response("READY", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("READY", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
     return 1;
@@ -536,23 +544,23 @@ int nrf_slte__get_SimPresent(void)
  * Implements [AT#CARRIER="time","read"] to get time returns seconds since UTC time 0. 
  * https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/applications/serial_lte_modem/doc/CARRIER_AT_commands.html#lwm2m-carrier-library-xcarrier
  */
-long nrf_slte__get_time(void)
+long sim7600__get_time(void)
 {
-    if (__nrf_slte__send_command("AT#XCARRIER=\"time\"\r\n") != SUCCESS)
+    if (__sim7600__send_command("AT#XCARRIER=\"time\"\r\n") != SUCCESS)
         return FAILURE; // Failed to send command
 
-    if(__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if(__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
     char resp[AT_BUFFER_SIZE] = {0};
-    int resp_len = __nrf_slte__get_resp(resp, AT_BUFFER_SIZE);
+    int resp_len = __sim7600__get_resp(resp, AT_BUFFER_SIZE);
 
     // Parse response given example: #XCARRIER: UTC_TIME: 2022-12-30T14:56:46Z, UTC_OFFSET: 60, TIMEZONE: Europe/Paris
     char* utc_date_time_str = strstr(resp, "UTC_TIME: ");
     if(utc_date_time_str == NULL)
         return FAILURE; // Invalid response
 
-    long unix_timestamp = __nrf_slte__get_unix_timestamp(utc_date_time_str);
+    long unix_timestamp = __sim7600__get_unix_timestamp(utc_date_time_str);
     if(unix_timestamp == FAILURE)
         return FAILURE; // Invalid response
 
@@ -560,25 +568,25 @@ long nrf_slte__get_time(void)
 }
 
 /*
- * calls "__nrf_slte__clearCert()" to clear the certificate, if it exists. 
+ * calls "__sim7600__clearCert()" to clear the certificate, if it exists. 
  * Then, Implements [AT%CMNG=0,12354,0,\"<ca>\"] to set CA certificate,
  *  where <ca> represents the contents of ca, with the null terminator removed.
- *  Then, enables the modem using "nrf_slte__power_on()" Returns 0 if ok. Returns -1 if error. 
+ *  Then, enables the modem using "sim7600__power_on()" Returns 0 if ok. Returns -1 if error. 
  * https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/applications/serial_lte_modem/doc/Generic_AT_commands.html#native-tls-cmng-xcmng
  */
-int nrf_slte__setCA(char* ca)
+int sim7600__setCA(char* ca)
 {
-    if (__nrf_slte__clearCert() != SUCCESS)
+    if (__sim7600__clearCert() != SUCCESS)
         return FAILURE; // Failed to clear certificate 
 
     char at_tx_buffer[AT_BUFFER_SIZE] = {0};
     snprintf(at_tx_buffer, sizeof(at_tx_buffer), "AT%%CMNG=0,12354,0,%s\r\n", ca); //FAULT
-    if (__nrf_slte__send_command(at_tx_buffer) != SUCCESS)
+    if (__sim7600__send_command(at_tx_buffer) != SUCCESS)
         return FAILURE; // Failed to send command
         
-    if (__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
-    if ( nrf_slte__power_on() != SUCCESS)
+    if ( sim7600__power_on() != SUCCESS)
         return FAILURE; // Failed to power on
     return SUCCESS;
 }
@@ -592,7 +600,7 @@ int nrf_slte__setCA(char* ca)
  * @param response_body: The HTTP response body
  * @param body_max_size: The maximum size of the body
  */
-int __nrf_slte_https_parse_resp(char* resp_input, char* response_header, int header_max_size, char* response_body, int body_max_size) 
+int __sim7600_https_parse_resp(char* resp_input, char* response_header, int header_max_size, char* response_body, int body_max_size) 
 {
     int processed_header = 0;  // Flag to indicate if processing the header or body, 1 = processing body
     int header_len = 0;
@@ -642,7 +650,7 @@ int __nrf_slte_https_parse_resp(char* resp_input, char* response_header, int hea
         line = strtok(NULL, "\n");
     }
 
-    int expected_content_len = __nrf_slte__get_http_content_len(response_header);
+    int expected_content_len = __sim7600__get_http_content_len(response_header);
     int recv_content_len = strlen(response_body);
     NRF_SLM_PRINTF("Expected Content Length: %d \n", expected_content_len);
     NRF_SLM_PRINTF("Received Content Length: %d \n", recv_content_len);
@@ -660,7 +668,7 @@ int __nrf_slte_https_parse_resp(char* resp_input, char* response_header, int hea
  * @param url: The URL to send the GET request to
  * @return int SUCCESS if ok. Returns FAILURE if error.
  */
-int __nrf_slte_httpsGET_send_req(char* url)
+int __sim7600_httpsGET_send_req(char* url)
 {
     int status;
     char resp[AT_BUFFER_SIZE] = {0};
@@ -670,19 +678,19 @@ int __nrf_slte_httpsGET_send_req(char* url)
     char* response_data;
 
     /* Extract hostname and path from URL */
-    __nrf_slte__parse_url(url, host, path);
+    __sim7600__parse_url(url, host, path);
     NRF_SLM_PRINTF("Host: %s\n", host);
     NRF_SLM_PRINTF("Path: %s\n", path);
 
     snprintf(at_send_buffer, sizeof(at_send_buffer), "AT#XHTTPCCON=1,\"%s\",443,12354\r\n", host);
     // Connect to HTTPS server using IPv4
-    if (__nrf_slte__send_command(at_send_buffer) != SUCCESS)
+    if (__sim7600__send_command(at_send_buffer) != SUCCESS)
         return FAILURE; // Failed to send command
 
-    if (__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
-    int resp_len = __nrf_slte__get_resp(resp, AT_BUFFER_SIZE);
+    int resp_len = __sim7600__get_resp(resp, AT_BUFFER_SIZE);
 
     response_data = strstr(resp, "#XHTTPCCON");
     if(response_data == NULL)
@@ -695,10 +703,10 @@ int __nrf_slte_httpsGET_send_req(char* url)
     // Connected to server, send GET request
     memset(at_send_buffer, 0, strlen(at_send_buffer));
     snprintf(at_send_buffer, sizeof(at_send_buffer), "AT#XHTTPCREQ=\"GET\",\"%s\"\r\n", path);
-    if (__nrf_slte__send_command(at_send_buffer) != SUCCESS)
+    if (__sim7600__send_command(at_send_buffer) != SUCCESS)
         return FAILURE; // Failed to send command
 
-    if (__nrf_slte__wait_4response("#XHTTPCREQ", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("#XHTTPCREQ", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
 
@@ -718,7 +726,7 @@ int __nrf_slte_httpsGET_send_req(char* url)
  * Returns      0 if ok. Returns -1 if error. Returns response in response char array. 
  * https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/applications/serial_lte_modem/doc/HTTPC_AT_commands.html
 */
-int __nrf_slte_httpsPOST_send_req(char* url, char* JSONdata, char* agent)
+int __sim7600_httpsPOST_send_req(char* url, char* JSONdata, char* agent)
 {
     int status;
     char resp[AT_BUFFER_SIZE] = {0};
@@ -728,19 +736,19 @@ int __nrf_slte_httpsPOST_send_req(char* url, char* JSONdata, char* agent)
     char* response_data;
 
     /* Extract hostname and path from URL */
-    __nrf_slte__parse_url(url, host, path);
+    __sim7600__parse_url(url, host, path);
     NRF_SLM_PRINTF("Host: %s\n", host);
     NRF_SLM_PRINTF("Path: %s\n", path);
 
     snprintf(at_send_buffer, sizeof(at_send_buffer), "AT#XHTTPCCON=1,\"%s\",443,12354\r\n", host);
     // Connect to HTTPS server using IPv4
-    if (__nrf_slte__send_command(at_send_buffer) != SUCCESS)
+    if (__sim7600__send_command(at_send_buffer) != SUCCESS)
         return FAILURE; // Failed to send command
 
-    if (__nrf_slte__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
-    int resp_len = __nrf_slte__get_resp(resp, AT_BUFFER_SIZE);
+    int resp_len = __sim7600__get_resp(resp, AT_BUFFER_SIZE);
 
     response_data = strstr(resp, "#XHTTPCCON");
     if(response_data == NULL)
@@ -753,10 +761,10 @@ int __nrf_slte_httpsPOST_send_req(char* url, char* JSONdata, char* agent)
     // Connected to server, send GET request
     memset(at_send_buffer, 0, strlen(at_send_buffer));
     snprintf(at_send_buffer, sizeof(at_send_buffer), "AT#XHTTPCREQ=\"POST\",\"%s\",\"User-Agent: %s\r\n\",\"application/json\",\"%s\"\r\n", path, agent, JSONdata);
-    if (__nrf_slte__send_command(at_send_buffer) != SUCCESS)
+    if (__sim7600__send_command(at_send_buffer) != SUCCESS)
         return FAILURE; // Failed to send command
 
-    if (__nrf_slte__wait_4response("#XHTTPCREQ", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("#XHTTPCREQ", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
 
@@ -777,9 +785,9 @@ int __nrf_slte_httpsPOST_send_req(char* url, char* JSONdata, char* agent)
  * Returns      0 if ok. Returns -1 if error. Returns response in response char array. 
  * https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/applications/serial_lte_modem/doc/HTTPC_AT_commands.html
 */
-int nrf_slte__httpsPOST(char* url, char* JSONdata, char* agent, char* response, uint16_t maxlength)
+int sim7600__httpsPOST(char* url, char* JSONdata, char* agent, char* response, uint16_t maxlength)
 {
-    if(__nrf_slte_httpsPOST_send_req(url, JSONdata, agent) != SUCCESS)
+    if(__sim7600_httpsPOST_send_req(url, JSONdata, agent) != SUCCESS)
         return FAILURE; // Failed to send request
 
     char resp[AT_BUFFER_SIZE] = {0};
@@ -789,17 +797,17 @@ int nrf_slte__httpsPOST(char* url, char* JSONdata, char* agent, char* response, 
     mailbox__flush(&at_rx_data);
     //TODO: Check if it's succifient OR need to wait for "OK" OR
     //TODO: wait for full HTTP response message (receive header, body and the #XHTTPCRSP for body should have state = 1)
-    if (__nrf_slte__wait_4response("#XHTTPCRSP", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("#XHTTPCRSP", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
-    int resp_len = __nrf_slte__get_resp(resp, AT_BUFFER_SIZE);
+    int resp_len = __sim7600__get_resp(resp, AT_BUFFER_SIZE);
         
     #if (TEST_USED_SAMPLE_HTTP_RESP == 1)   // Overwrite resp with sample HTTP response
     memset(resp, 0, AT_BUFFER_SIZE);
     strncpy(resp, HTTP_RESP_EXAMPLE, AT_BUFFER_SIZE);
     #endif /* End of (TEST_USED_SAMPLE_HTTP_RESP == 1) */
 
-    int ret_val = __nrf_slte_https_parse_resp(resp, http_resp_header, AT_HTTP_HEADER_MAX_SIZE, http_resp_body, AT_HTTP_BODY_MAX_SIZE);
+    int ret_val = __sim7600_https_parse_resp(resp, http_resp_header, AT_HTTP_HEADER_MAX_SIZE, http_resp_body, AT_HTTP_BODY_MAX_SIZE);
     NRF_SLM_PRINTF("HTTP Response Header: \n%s\n", http_resp_header);
     NRF_SLM_PRINTF("HTTP Response Body: \n%s\n", http_resp_body);
 
@@ -813,10 +821,10 @@ int nrf_slte__httpsPOST(char* url, char* JSONdata, char* agent, char* response, 
     }
 }
 
-int nrf_slte__httpsGET(char* url, char* response, uint16_t maxlength)
+int sim7600__httpsGET(char* url, char* response, uint16_t maxlength)
 {
     
-    if(__nrf_slte_httpsGET_send_req(url) != SUCCESS)
+    if(__sim7600_httpsGET_send_req(url) != SUCCESS)
         return FAILURE; // Failed to send request
 
     char resp[AT_BUFFER_SIZE] = {0};
@@ -827,17 +835,17 @@ int nrf_slte__httpsGET(char* url, char* response, uint16_t maxlength)
     mailbox__flush(&at_rx_data);
     //TODO: Check if it's succifient OR need to wait for "OK" OR
     //TODO: wait for full HTTP response message (receive header, body and the #XHTTPCRSP for body should have state = 1)
-    if (__nrf_slte__wait_4response("#XHTTPCRSP", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    if (__sim7600__wait_4response("#XHTTPCRSP", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
-    int resp_len = __nrf_slte__get_resp(resp, AT_BUFFER_SIZE);
+    int resp_len = __sim7600__get_resp(resp, AT_BUFFER_SIZE);
     
     #if (TEST_USED_SAMPLE_HTTP_RESP == 1)   // Overwrite resp with sample HTTP response
     memset(resp, 0, AT_BUFFER_SIZE);
     strncpy(resp, HTTP_RESP_EXAMPLE, AT_BUFFER_SIZE);
     #endif /* End of (TEST_USED_SAMPLE_HTTP_RESP == 1) */
 
-    int ret_val = __nrf_slte_https_parse_resp(resp, http_resp_header, AT_HTTP_HEADER_MAX_SIZE, http_resp_body, AT_HTTP_BODY_MAX_SIZE);
+    int ret_val = __sim7600_https_parse_resp(resp, http_resp_header, AT_HTTP_HEADER_MAX_SIZE, http_resp_body, AT_HTTP_BODY_MAX_SIZE);
     NRF_SLM_PRINTF("HTTP Response Header: \n%s\n", http_resp_header);
     NRF_SLM_PRINTF("HTTP Response Body: \n%s\n", http_resp_body);
 
@@ -866,7 +874,7 @@ int main() {
         {
             case 1:
             {
-                if ( nrf_slte__power_on() != SUCCESS ) {
+                if ( sim7600__power_on() != SUCCESS ) {
                     NRF_SLM_PRINTF("Failed to power on modem \r\n ");
                 }
                 else
@@ -878,7 +886,7 @@ int main() {
 
             case 2:
             {
-                if ( nrf_slte__power_off() != SUCCESS ) {
+                if ( sim7600__power_off() != SUCCESS ) {
                     NRF_SLM_PRINTF("Failed to power off modem \r\n ");
                 }
                 else
@@ -890,7 +898,7 @@ int main() {
 
             case 3:
             {
-                if( (temp_var = nrf_slte__get_rssi()) == FAILURE)
+                if( (temp_var = sim7600__get_rssi()) == FAILURE)
                 {
                     NRF_SLM_PRINTF("Failed to get RSSI \r\n ");
                 }
@@ -903,7 +911,7 @@ int main() {
 
             case 4:
             {
-                if( (temp_var = nrf_slte__connected()) != 1)
+                if( (temp_var = sim7600__connected()) != 1)
                 {
                     NRF_SLM_PRINTF("Failed to get connection status \r\n ");
                 }
@@ -916,7 +924,7 @@ int main() {
 
             case 5: 
             {
-                if( (temp_var = nrf_slte__get_SimPresent()) != 1)
+                if( (temp_var = sim7600__get_SimPresent()) != 1)
                 {
                     NRF_SLM_PRINTF("Failed to get SIM status \r\n ");
                 }
@@ -929,7 +937,7 @@ int main() {
 
             case 6:
             {
-                if( (temp_var = nrf_slte__get_time()) == FAILURE)
+                if( (temp_var = sim7600__get_time()) == FAILURE)
                 {
                     NRF_SLM_PRINTF("Failed to get time \r\n ");
                 }
@@ -943,7 +951,7 @@ int main() {
             case 7:
             {
                 char cacert_test[] = "-----BEGIN CERTIFICATE-----\n";
-                if( (temp_var = nrf_slte__setCA(cacert_test)) != SUCCESS)
+                if( (temp_var = sim7600__setCA(cacert_test)) != SUCCESS)
                 {
                     NRF_SLM_PRINTF("Failed to set CA \r\n ");
                 }
@@ -957,7 +965,7 @@ int main() {
             case 8:
             {
                 long cur_time;
-                if ((cur_time = nrf_slte__get_time()) == FAILURE)
+                if ((cur_time = sim7600__get_time()) == FAILURE)
                 {
                     NRF_SLM_PRINTF("Failed to get time \r\n ");
                 }
@@ -971,7 +979,7 @@ int main() {
             case 9:
             {
                 //Test connected
-                if( (temp_var = nrf_slte__connected()) != 1)
+                if( (temp_var = sim7600__connected()) != 1)
                 {
                     NRF_SLM_PRINTF("Failed to get connection status \r\n ");
                 }
@@ -985,7 +993,7 @@ int main() {
             case 10:
             {
                 char http_resp_buffer[1024] = {0};
-                nrf_slte__httpsGET("google.com/myurl", http_resp_buffer, 1024);
+                sim7600__httpsGET("google.com/myurl", http_resp_buffer, 1024);
                 NRF_SLM_PRINTF("\r\n===================================================\r\n");
                 NRF_SLM_PRINTF("HTTP Response: %s\n", http_resp_buffer);
                 NRF_SLM_PRINTF("\r\n===================================================\r\n");
@@ -998,7 +1006,7 @@ int main() {
                 // Test json with value: {"hello":"world"}
                 char json_data[] = "{\"hello\":\"world\"}";
                 char agent[] = "slm";
-                nrf_slte__httpsPOST("google.com/myurl", json_data, agent, http_resp_buffer, 1024);
+                sim7600__httpsPOST("google.com/myurl", json_data, agent, http_resp_buffer, 1024);
                 NRF_SLM_PRINTF("\r\n===================================================\r\n");
                 NRF_SLM_PRINTF("HTTP Response: %s\n", http_resp_buffer);
                 NRF_SLM_PRINTF("\r\n===================================================\r\n");
