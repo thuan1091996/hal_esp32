@@ -23,8 +23,10 @@
 /******************************************************************************
 * Module configurations
 *******************************************************************************/
-#define TEST_USED_SAMPLE_HTTP_RESP      (1) /* Set to 1 overwrite response data with HTTP_RESP_EXAMPLE[] */
+#define TEST_USED_SAMPLE_HTTP_RESP      (0) /* Set to 1 overwrite response data with HTTP_RESP_EXAMPLE[] */
 #define TEST_AT_DEBUG_PRINTF            (1) /* Set to 1 to print log msg using printf()*/     
+#define TEST_DUMP_DATA                  (1) /* Set to 1 to print data received in mailbox */
+
 
 #define PORT_DELAY_MS(MS)               (vTaskDelay(MS / portTICK_PERIOD_MS))
 #define PORT_GET_SYSTIME_MS()           (xTaskGetTickCount() * portTICK_PERIOD_MS)
@@ -42,6 +44,20 @@
 #else  /* !(TEST_AT_DEBUG_PRINTF == 1) */
 #define SIM7600_PRINTF(args...)                 (void)
 #endif /* End of (TEST_AT_DEBUG_PRINTF == 1) */
+
+// Specifically for ESP_IDF
+#ifdef CONFIG_IDF_TARGET_ESP32
+#include "esp_log.h"
+
+#define TAG                             "LTE_DRIVER"
+#define SIM7600_INFO_PRINTF(args...)    ESP_LOGI(TAG, args)
+#define SIM7600_INFO_PRINT_HEX(data, len) ESP_LOG_BUFFER_HEXDUMP(TAG, data, len, ESP_LOG_INFO)
+#else /* !(CONFIG_IDF_TARGET_ESP32) */
+
+#define SIM7600_INFO_PRINTF(args...)    (void)
+#define SIM7600_INFO_PRINT_HEX(data, len) (void)
+#endif /* End of (CONFIG_IDF_TARGET_ESP32) */
+
 
 #if (TEST_USED_SAMPLE_HTTP_RESP == 1)
 char HTTP_RESP_EXAMPLE[]= "HTTP/1.1 200 OK\n"
@@ -126,6 +142,13 @@ int mailbox__flush(at_resp_data_mailbox_t* mailbox)
     param_check(mailbox != NULL);
     mailbox->rx_len = 0;
     memset(mailbox->rx_data, 0, sizeof(mailbox->rx_data));
+    return SUCCESS;
+}
+
+int mailbox_logdata(at_resp_data_mailbox_t* mailbox)
+{
+    param_check(mailbox != NULL);
+    SIM7600_INFO_PRINTF("%s", mailbox->rx_data);
     return SUCCESS;
 }
 
@@ -286,10 +309,12 @@ int __sim7600__wait_4response(char* expected_resp, uint16_t timeout_ms)
     uint16_t recv_idx = 0;
     uint64_t max_recv_timeout = PORT_GET_SYSTIME_MS() + timeout_ms;
     // Wait until maximum AT_DEFAULT_TIMEOUT_MS to receive expected_resp
+#if (TEST_DUMP_DATA == 1)
+SIM7600_INFO_PRINTF(" ======================================================================== ");
+#endif /* End of (TEST_DUMP_DATA == 1) */
     while (PORT_GET_SYSTIME_MS() < max_recv_timeout)
     {
         uint16_t resp_len = hal__UARTAvailable(AT_DEFAULT_UART_PORT);
-        //TODO: if length too much, buffer is still available in UART hardware
         if(recv_idx + resp_len > sizeof(rcv_buf) )
         {
             SIM7600_PRINTF("__sim7600__wait_4response(), Buffer overflow, discarded %dB\n", recv_idx + resp_len - sizeof(rcv_buf));
@@ -300,7 +325,10 @@ int __sim7600__wait_4response(char* expected_resp, uint16_t timeout_ms)
         {
             hal__UARTRead(AT_DEFAULT_UART_PORT, &rcv_buf[recv_idx], resp_len);
             recv_idx += resp_len;
-
+#if (TEST_DUMP_DATA == 1)
+            SIM7600_INFO_PRINT_HEX(&rcv_buf[recv_idx - resp_len], resp_len);
+SIM7600_INFO_PRINTF(" ======================================================================== ");
+#endif /* End of (TEST_DUMP_DATA == 1) */
             if(strstr((char*)rcv_buf, "ERR") != NULL)
                 return FAILURE; // Error response received
             else if(strstr((char*)rcv_buf, expected_resp) != NULL)
@@ -396,36 +424,39 @@ int sim7600__power_off(void)
 {
     // CFUN=0 causes writing to NVM. When using CFUN=0, take NVM wear into account
     //  => Ready curent mode first to avoid unnecessary NVM writes  
-    if (__sim7600__send_command("AT+CFUN?\r\n") != SUCCESS)
+    // Check the current functional mode, if already in power off mode, return SUCCESS. Otherwise force to power off
+    do
+    {
+        if (__sim7600__send_command("AT+CFUN?\r\n") != SUCCESS)
+            break;
+        if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+            break;
+
+        char resp[AT_BUFFER_SIZE] = {0};
+        int resp_len = __sim7600__get_resp(resp, sizeof(resp));
+
+        int cur_func_mode;
+        char* cur_func_mode_str = strstr(resp, "+CFUN: ");
+        if(cur_func_mode_str == NULL)
+            break;
+
+        //Get first token to extract current functional mode
+        cur_func_mode_str = strtok(cur_func_mode_str, "\n");
+        if(cur_func_mode_str == NULL)
+            break; // Invalid response 
+        if(sscanf(cur_func_mode_str, "+CFUN: %d ", &cur_func_mode) != 1)
+            break; // Invalid response
+        
+        if(cur_func_mode == 0)
+            return SUCCESS; // Already in power off mode
+
+    }while(0);
+
+    if (__sim7600__send_command("AT+CFUN=0\r\n") != SUCCESS)
         return FAILURE; // Failed to send command
     if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
-
-    char resp[AT_BUFFER_SIZE] = {0};
-    int resp_len = __sim7600__get_resp(resp, sizeof(resp));
-
-    int cur_func_mode;
-    char* cur_func_mode_str = strstr(resp, "+CFUN: ");
-    if(cur_func_mode_str == NULL)
-        return FAILURE; // Invalid response
-
-    //Get first token to extract current functional mode
-    cur_func_mode_str = strtok(cur_func_mode_str, "\n");
-    if(cur_func_mode_str == NULL)
-        return FAILURE; // Invalid response 
-    if(sscanf(cur_func_mode_str, "+CFUN: %d ", &cur_func_mode) != 1)
-        return FAILURE; // Invalid response
-    
-    if(cur_func_mode == 0)
-        return SUCCESS; // Already in power off mode
-
-    else 
-    {
-        if (__sim7600__send_command("AT+CFUN=0\r\n") != SUCCESS)
-            return FAILURE; // Failed to send command
-        if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
-            return FAILURE; // Failed to receive resp (no "OK" received within timeout")
-    }
+        
     return SUCCESS;
 }
 
@@ -489,14 +520,14 @@ int sim7600__connected(void)
 
     // TODO: Need more work
     // Retrieve network status
-    // char* network_status = sscanf(cops_response_str, "+COPS: %d", &network_status);
-    // if(network_status == NULL)
-    //     return FAILURE; // Invalid response
-    
-    // if(network_status == 2)
-    //     return 1; // Connected
-    // else
-    //     return 0; // Not connected
+    int network_status;
+    if (sscanf(cops_response_str, "+COPS: %d", &network_status) != 1)
+        return FAILURE;
+
+    if(network_status == 2)
+        return 1; // Connected
+    else
+        return 0; // Not connected
     return FAILURE;
 }
 
@@ -510,7 +541,7 @@ int sim7600__get_SimPresent(void)
         return FAILURE; // Failed to send command
 
     if (__sim7600__wait_4response("READY", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
-        return FAILURE; // Failed to receive resp (no "OK" received within timeout")
+        return FAILURE; // Failed to receive resp (no "READY" received within timeout")
 
     return 1;
 }
@@ -662,6 +693,8 @@ int __sim7600_httpsGET_send_req(char* url)
     // Connect to HTTPS server using IPv4
     if (__sim7600__send_command(at_send_buffer) != SUCCESS)
         return FAILURE; // Failed to send command
+	
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
@@ -685,6 +718,8 @@ int __sim7600_httpsGET_send_req(char* url)
     snprintf(at_send_buffer, sizeof(at_send_buffer), "AT#XHTTPCREQ=\"GET\",\"%s\"\r\n", path);
     if (__sim7600__send_command(at_send_buffer) != SUCCESS)
         return FAILURE; // Failed to send command
+
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     if (__sim7600__wait_4response("#XHTTPCREQ", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
@@ -732,6 +767,8 @@ int __sim7600_httpsPOST_send_req(char* url, char* JSONdata, char* agent)
     if (__sim7600__send_command(at_send_buffer) != SUCCESS)
         return FAILURE; // Failed to send command
 
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
+
     if (__sim7600__wait_4response("OK", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
 
@@ -755,6 +792,8 @@ int __sim7600_httpsPOST_send_req(char* url, char* JSONdata, char* agent)
     snprintf(at_send_buffer, sizeof(at_send_buffer), "AT#XHTTPCREQ=\"POST\",\"%s\",\"User-Agent: %s\r\n\",\"application/json\",\"%s\"\r\n", path, agent, JSONdata);
     if (__sim7600__send_command(at_send_buffer) != SUCCESS)
         return FAILURE; // Failed to send command
+
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     if (__sim7600__wait_4response("#XHTTPCREQ", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
         return FAILURE; // Failed to receive resp (no "OK" received within timeout")
@@ -792,6 +831,9 @@ int sim7600__httpsPOST(char* url, char* JSONdata, char* agent, char* response, u
     char http_resp_body[AT_HTTP_BODY_MAX_SIZE] = {0};
     
     mailbox__flush(&at_rx_data);
+	
+	vTaskDelay(3000 / portTICK_PERIOD_MS);
+
     //TODO: Check if it's succifient OR need to wait for "OK" OR
     //TODO: wait for full HTTP response message (receive header, body and the #XHTTPCRSP for body should have state = 1)
     if (__sim7600__wait_4response("#XHTTPCRSP", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
@@ -830,6 +872,8 @@ int sim7600__httpsGET(char* url, char* response, uint16_t maxlength)
 
 
     mailbox__flush(&at_rx_data);
+	
+	vTaskDelay(3000 / portTICK_PERIOD_MS);
     //TODO: Check if it's succifient OR need to wait for "OK" OR
     //TODO: wait for full HTTP response message (receive header, body and the #XHTTPCRSP for body should have state = 1)
     if (__sim7600__wait_4response("#XHTTPCRSP", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
@@ -856,7 +900,9 @@ int sim7600__httpsGET(char* url, char* response, uint16_t maxlength)
     }  
 }
 
-volatile uint8_t g_test = 10;
+volatile uint8_t g_test = 0;
+extern const char howmyssl_ca[];
+extern const char httpbin_ca[];
 void lte_modem_custom_task(void *pvParameters)
 {
     SIM7600_PRINTF("Testing HTTP Parser started \r\n");
@@ -871,8 +917,27 @@ void lte_modem_custom_task(void *pvParameters)
         {
             case 10:
             {
-                char http_resp_buffer[1024] = {0};
-                sim7600__httpsGET("google.com/myurl", http_resp_buffer, 1024);
+                // Clear certificate
+                if( (temp_var = __sim7600__clearCert()) != SUCCESS)
+                {
+                    SIM7600_PRINTF("Failed to clear certificate \r\n ");
+                }
+                else
+                {
+                    SIM7600_PRINTF("Certificate cleared \r\n");
+                }
+                // set CA
+                if( (temp_var = sim7600__setCA(howmyssl_ca)) != SUCCESS)
+                {
+                    SIM7600_PRINTF("Failed to set CA \r\n ");
+                }
+                else
+                {
+                    SIM7600_PRINTF("CA set \r\n");
+                }
+                char url[] = "howsmyssl.com/a/check";
+                char http_resp_buffer[2048] = {0};
+                sim7600__httpsGET(url , http_resp_buffer, sizeof(http_resp_buffer));
                 SIM7600_PRINTF("\r\n===================================================\r\n");
                 SIM7600_PRINTF("HTTP Response: %s\n", http_resp_buffer);
                 SIM7600_PRINTF("\r\n===================================================\r\n");
@@ -881,11 +946,30 @@ void lte_modem_custom_task(void *pvParameters)
 
             case 11:
             {
-                char http_resp_buffer[1024] = {0};
-                // Test json with value: {"hello":"world"}
-                char json_data[] = "{\"hello\":\"world\"}";
+                // Clear certificate
+                if( (temp_var = __sim7600__clearCert()) != SUCCESS)
+                {
+                    SIM7600_PRINTF("Failed to clear certificate \r\n ");
+                }
+                else
+                {
+                    SIM7600_PRINTF("Certificate cleared \r\n");
+                }
+                // set CA
+                if( (temp_var = sim7600__setCA(httpbin_ca)) != SUCCESS)
+                {
+                    SIM7600_PRINTF("Failed to set CA \r\n ");
+                }
+                else
+                {
+                    SIM7600_PRINTF("CA set \r\n");
+                }
+
+                char http_resp_buffer[2048] = {0};
                 char agent[] = "slm";
-                sim7600__httpsPOST("google.com/myurl", json_data, agent, http_resp_buffer, 1024);
+                char url[] = "httpbin.org/post";
+                char json_data[] = "{\"foo1\":\"bar1\",\"foo2\":\"bar2\"}";
+                sim7600__httpsPOST(url, json_data, agent, http_resp_buffer, sizeof(http_resp_buffer));
                 SIM7600_PRINTF("\r\n===================================================\r\n");
                 SIM7600_PRINTF("HTTP Response: %s\n", http_resp_buffer);
                 SIM7600_PRINTF("\r\n===================================================\r\n");
@@ -929,9 +1013,9 @@ void lte_modem_custom_task(void *pvParameters)
                 break;
             }
 
-            case 4:
+            case 4: //TODO: Need more work
             {
-                if( (temp_var = sim7600__connected()) != 1)
+                if( (temp_var = sim7600__connected()) < 0)
                 {
                     SIM7600_PRINTF("Failed to get connection status \r\n ");
                 }
@@ -970,6 +1054,19 @@ void lte_modem_custom_task(void *pvParameters)
 
             case 7:
             {
+                // Clear certificate
+                if( (temp_var = __sim7600__clearCert()) != SUCCESS)
+                {
+                    SIM7600_PRINTF("Failed to clear certificate \r\n ");
+                }
+                else
+                {
+                    SIM7600_PRINTF("Certificate cleared \r\n");
+                }
+            }
+
+            case 8:
+            {
                 char cacert_test[] = "-----BEGIN CERTIFICATE-----\n";
                 if( (temp_var = sim7600__setCA(cacert_test)) != SUCCESS)
                 {
@@ -981,35 +1078,6 @@ void lte_modem_custom_task(void *pvParameters)
                 }
                 break;
             }
-
-            case 8:
-            {
-                long cur_time;
-                if ((cur_time = sim7600__get_time()) == FAILURE)
-                {
-                    SIM7600_PRINTF("Failed to get time \r\n ");
-                }
-                else
-                {
-                    SIM7600_PRINTF("Time: %ld \r\n", cur_time);
-                }
-                break;
-            }
-
-            case 9:
-            {
-                //Test connected
-                if( (temp_var = sim7600__connected()) != 1)
-                {
-                    SIM7600_PRINTF("Failed to get connection status \r\n ");
-                }
-                else
-                {
-                    SIM7600_PRINTF("Connection status %d \r\n", temp_var);
-                }
-                break;
-            }
-
         }
     }
     SIM7600_PRINTF("************************************* END ***************************************");
