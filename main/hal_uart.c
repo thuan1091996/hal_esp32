@@ -197,3 +197,12 @@ int hal__UARTRead(uint8_t uartNum, uint8_t *data, uint16_t len)
 	else
 		return read_len;
 }
+//Flush RX buffer. Returns 0 on success, -1 on failure.
+int hal__UARTFlushRX(uint8_t uartNum)
+{
+    param_check( (1 <= uartNum) && (uartNum <= 2) );
+    if (uart_flush_input(uartNum) != ESP_OK)
+        return FAILURE;
+    else
+        return SUCCESS;
+}
