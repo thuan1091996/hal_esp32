@@ -59,7 +59,7 @@ int hal__UARTWrite(uint8_t uartNum, uint8_t *data, uint16_t len); //Write data t
 
 int hal__UARTRead_uint8(uint8_t uartNum, uint8_t *data); //Read data from UART. Returns 0 on success, -1 on failure.
 int hal__UARTRead(uint8_t uartNum, uint8_t *data, uint16_t len); //Read data from UART. Returns number of bytes read on success, -1 on failure.
-
+int hal__UARTFlushRX(uint8_t uartNum); //Flush RX buffer. Returns 0 on success, -1 on failure.
 /* I2C_HELPER_FUNCTIONS */
 bool hal__I2CEXISTS(uint8_t i2c_num, uint8_t ADDR); //Returns true if I2C device exists at ADDR, false if not.
 
@@ -72,6 +72,9 @@ int hal__I2CWRITE(uint8_t i2c_num, uint8_t ADDR, uint8_t REG, uint8_t *data, uin
 /* ADC_HELPER_FUNCTIONS */
 int hal__ADCRead(uint8_t pin);
 int hal__ADCReadMV(uint8_t pin);
+
+/* Common functions */
+int hal__getStackSize(void); //Returns the stack size of the current task. Returns current stack size on success, -1 on failure.
 
 #ifdef __cplusplus
 }

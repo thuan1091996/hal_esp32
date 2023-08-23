@@ -51,6 +51,7 @@
 #define LOAD_WIFI_CREDENTIAL_NVS    (1)
 #define WIFI_RETRY_CONN_MAX  	    (5)
 #define CERT_MAX_LEN                (2048)
+#define CERT_LOAD_TO_RAM            (1)     /* Set to 1 will load cert to "wifi_cert" when write cert*/
 
 
 #define WIFI_CONNECTED_BIT 			BIT0
@@ -370,7 +371,7 @@ int wifi_custom__power_on(void)
             pdFALSE,
             pdMS_TO_TICKS(15000));
 
-    if (bits & WIFI_CONNECTED_BIT || bits & ESPTOUCH_GOT_CREDENTIAL)
+    if ((bits & WIFI_CONNECTED_BIT) || (bits & ESPTOUCH_GOT_CREDENTIAL))
     {
         if(bits & ESPTOUCH_GOT_CREDENTIAL) 
         {
@@ -398,7 +399,7 @@ int wifi_custom__power_off(void)
 //Implements esp_wifi functions to determine if currently connected to a network.
 int wifi_custom__connected(void)
 {
-        EventBits_t bit_mask = xEventGroupGetBits(s_wifi_event_group);
+	EventBits_t bit_mask = xEventGroupGetBits(s_wifi_event_group);
     if(bit_mask & WIFI_CONNECTED_BIT)
     {
         ESP_LOGI("wifi_custom", "Wi-Fi is connected");
@@ -554,8 +555,11 @@ int wifi_custom__setCA(char* cert)
         }
 
         ESP_LOGI("wifi_custom", "Certificate written successfully");
+
+#if (CERT_LOAD_TO_RAM != 0) 
         memset(wifi_cert, 0, sizeof(wifi_cert));
         strcpy(wifi_cert, cert);
+#endif /*(CERT_LOAD_TO_RAM != 0) */
 
         nvs_close(handle);
         return 0;
@@ -792,7 +796,7 @@ int wifi_custom__httpsPOST(char* url, char* JSONdata, char* agent, char* respons
     return http_status;
 }
 
-const char howmyssl_ca[]= \
+const char howmyssl_ca[] = 
 "-----BEGIN CERTIFICATE-----\n" \
 "MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw\n" \
 "TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh\n" \
@@ -825,7 +829,7 @@ const char howmyssl_ca[]= \
 "emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=\n" \
 "-----END CERTIFICATE-----\n";
 
-const char* httpbin_ca = 
+const char httpbin_ca[] = 
 "-----BEGIN CERTIFICATE-----\n" \
 "MIIDQTCCAimgAwIBAgITBmyfz5m/jAo54vB4ikPmljZbyjANBgkqhkiG9w0BAQsF\n" \
 "ADA5MQswCQYDVQQGEwJVUzEPMA0GA1UEChMGQW1hem9uMRkwFwYDVQQDExBBbWF6\n" \
@@ -860,6 +864,7 @@ int wifi_custom_test_https_get()
     {
         ESP_LOGE("wifi_http", "Failed to get certificate");
         wifi_custom__setCA(howmyssl_ca);
+        memset(wifi_cert, 0, sizeof(wifi_cert));
         if ( wifi_custom__getCA(wifi_cert, CERT_MAX_LEN) != 0)
         {
             ESP_LOGE("wifi_http", "Failed to get certificate");
@@ -887,7 +892,8 @@ int wifi_custom_test_https_post()
     if ( wifi_custom__getCA(wifi_cert, CERT_MAX_LEN) != 0)
     {
         ESP_LOGE("wifi_http", "Failed to get certificate");
-        wifi_custom__setCA(howmyssl_ca);
+        wifi_custom__setCA(httpbin_ca);
+        memset(wifi_cert, 0, sizeof(wifi_cert));
         if ( wifi_custom__getCA(wifi_cert, CERT_MAX_LEN) != 0)
         {
             ESP_LOGE("wifi_http", "Failed to get certificate");

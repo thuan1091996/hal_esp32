@@ -73,7 +73,7 @@ uint8_t channels_resolution[LEDC_CHANNELS] = {0};
 static int8_t pin_to_channel[SOC_GPIO_PIN_COUNT] = { 0 };
 static int cnt_channel = LEDC_CHANNELS;
 /******************************************************************************
-* Function Prototypes
+* Static functions
 *******************************************************************************/
 
 /**
@@ -162,6 +162,10 @@ static int8_t __analogGetChannel(uint8_t pin) {
     return pin_to_channel[pin];
 }
 
+/******************************************************************************
+* Function Definitions
+*******************************************************************************/
+
 //Set Duty Cycle, in tenths of percent. For Example, Passing (1, 50) will set Timer 1 Channel 1 to 5.0%. Returns 0 on success, -1 on failure.
 int hal__setDutyCycle(uint8_t pin, uint16_t dutyCycle_tenth)
 {
@@ -197,6 +201,3 @@ int hal__setDutyCycle(uint8_t pin, uint16_t dutyCycle_tenth)
     return SUCCESS;
 }
 
-/******************************************************************************
-* Function Definitions
-*******************************************************************************/
