@@ -15,7 +15,7 @@
 * Module Preprocessor Constants
 *******************************************************************************/
 #define AT_DEFAULT_UART_PORT            (2)
-#define AT_DEFAULT_TIMEOUT_MS           (10000UL)
+#define AT_DEFAULT_TIMEOUT_MS           (20000UL)
 #define AT_BUFFER_SIZE                  (1024UL)
 #define AT_HTTP_HEADER_MAX_SIZE         (1024UL)
 #define AT_HTTP_BODY_MAX_SIZE           (1024UL)
@@ -72,6 +72,24 @@ char HTTP_RESP_EXAMPLE[]= "HTTP/1.1 200 OK\n"
                             "#XHTTPCRSP:342,1\n"
                             "{\"args\":{},\"data\":{\"hello\":\"world\"},\"files\":{},\"form\":{},\"headers\":{\"x-forwarded-proto\":\"http\",\"x-forwarded-port\":\"80\",\"host\":\"postman-echo.com\",\"x-amzn-trace-id\":\"Root=1-621dad94-2fcac1637dc28f172c6346e6\",\"content-length\":\"17\",\"user-agent\":\"slm\",\"accept\":\"*/*\",\"content-type\":\"application/json\"},\"json\":{\"hello\":\"world\"},\"url\":\"http://postman-echo.com/post\"}\n"
                             "#XHTTPCRSP:359,1\n";
+
+const char HTTP_RESP_EXAMPLE[] =  
+"#XHTTPCRSP:341,0\r\n"
+// header
+"HTTP/1.1 200 OK\r\n"
+"Date: Thu, 11 Mar 2021 04:36:19 GMT\r\n"
+"Content-Type: application/json; charset=utf-8\r\n"
+"Content-Length: 244\r\n"
+"Connection: keep-alive\r\n"
+"ETag: W/\"f4-ZKlqfH53aEj3f4zb0kDtYvHD+XU\"\r\n"
+"Vary: Accept-Encoding\r\n"
+"set-cookie: sails.sid=s%3AHGcBwpqlDDUZhU16VzuQkfTMhWhA4W1T.%2Bgm1%2BezKGo2JnWxaB5yYDo%2FNh0NbnJzJjEnkMcrfdEI; Path=/; HttpOnly\r\n"
+// body
+"#XHTTPCRSP:243,0\r\n"
+"{\"args\":{\"foo1\":\"bar1\",\"foo2\":\"bar2\"},\"headers\":{\"x-forwarded-proto\":\"http\",\"x-forwarded-port\":\"80\",\"host\":\"postman-echo.com\",\"x-amzn-trace-id\":\"Root=1-60499e43-67a96f1e18fec45b1db78c25\"},\"url\":\"http://postman-echo.com/get?foo1=bar1&foo2=bar2\"}\r\n"
+"#XHTTPCRSP:1,0\r\n"
+"}\r\n"
+"#XHTTPCRSP:0,1\r\n";
 #endif /* End of (TEST_USED_SAMPLE_HTTP_RESP == 1) */
 
 
@@ -359,6 +377,12 @@ int __sim7600__get_resp(char* resp, uint16_t maxlength)
 {
     param_check(resp != NULL);
     uint16_t cur_len = mailbox__get_len(&at_rx_data);
+    if(cur_len > maxlength)
+    {
+        SIM7600_PRINTF("__sim7600__get_resp(), Buffer overflow, current buffer length: %dB, maxlength: %dB, discarded %dB\n",
+        cur_len, maxlength, cur_len - maxlength);
+        cur_len = maxlength;
+    }
     if( cur_len != 0)
     {
         cur_len = mailbox__get_data(&at_rx_data, resp, cur_len);
@@ -669,6 +693,62 @@ int __sim7600_https_parse_resp(char* resp_input, char* response_header, int head
     return SUCCESS;
 }
 
+// Parse HTTP response
+// Input: resp_input, resp_max_len
+// Output: resp_output
+// Return: SUCCESS or FAILURE
+int __sim7600_https_parse_respv2(char* resp_input, char* resp_output, int resp_max_len)
+{
+    char* p_process = NULL;
+    int recv_content_len = 0;
+    int recv_state = 0;
+    int recv_cur_len = 0;
+    // Split the response by newline characters
+    char *line = strtok((char *)resp_input, "\n");
+
+    while (line != NULL)
+    {
+        p_process = strstr(line, "#XHTTPCRSP:");
+        if(p_process != NULL)
+        {
+            // Get received length and status
+            if (sscanf(p_process, "#XHTTPCRSP:%d,%d", &recv_content_len, &recv_state) != 2)
+            {
+                SIM7600_PRINTF("Invalid response, current processing %s\n", line);
+                continue;
+            }
+            if(recv_state == 0)
+                SIM7600_PRINTF("Receiving %dB \n", recv_content_len);
+            else if(recv_state == 1)
+                return SUCCESS;
+        }
+        else
+        {
+            // Check total length of response to prevent buffer overflow
+            if(recv_cur_len + strlen(line) > resp_max_len)
+            {
+                SIM7600_PRINTF("__sim7600_https_parse_respv2(), Buffer overflow by %d \n", recv_cur_len + strlen(line) - resp_max_len);
+                // Fill until resp_output[resp_max_len] is full and discard the rest
+                if(recv_cur_len < resp_max_len)
+                    strncat(resp_output, line, resp_max_len - recv_cur_len);
+                recv_cur_len += strlen(line); // Make sure that in the end, we know how many bytes are lost due to buffer overflow
+                continue;
+            }
+            // Append response to response buffer
+            strcat(resp_output, line);
+            recv_cur_len += strlen(line);
+            // Check overflow and append with '\n' if not overflow
+            if(recv_cur_len < resp_max_len)
+            {
+                strcat(resp_output, "\n");
+                recv_cur_len += 1;
+            }
+        }
+        line = strtok(NULL, "\n");
+    }
+    return FAILURE;
+}
+
 /**
  * @brief Connect and Send HTTPS GET request to the server
  * 
@@ -836,8 +916,10 @@ int sim7600__httpsPOST(char* url, char* JSONdata, char* agent, char* response, u
 
     //TODO: Check if it's succifient OR need to wait for "OK" OR
     //TODO: wait for full HTTP response message (receive header, body and the #XHTTPCRSP for body should have state = 1)
-    if (__sim7600__wait_4response("#XHTTPCRSP", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
-        return FAILURE; // Failed to receive resp (no "OK" received within timeout")
+    if (__sim7600__wait_4response("#XHTTPCRSP:0,1", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    {
+        SIM7600_PRINTF("Failed to receive full HTTP response within timeout, try to parse ... \n");
+    }
 
     int resp_len = __sim7600__get_resp(resp, sizeof(resp));
         
@@ -846,7 +928,9 @@ int sim7600__httpsPOST(char* url, char* JSONdata, char* agent, char* response, u
     strncpy(resp, HTTP_RESP_EXAMPLE, AT_BUFFER_SIZE);
     #endif /* End of (TEST_USED_SAMPLE_HTTP_RESP == 1) */
 
-    int ret_val = __sim7600_https_parse_resp(resp, http_resp_header, AT_HTTP_HEADER_MAX_SIZE, http_resp_body, AT_HTTP_BODY_MAX_SIZE);
+
+    // int ret_val = __sim7600_https_parse_resp(resp, http_resp_header, AT_HTTP_HEADER_MAX_SIZE, http_resp_body, AT_HTTP_BODY_MAX_SIZE);
+    int ret_val = __sim7600_https_parse_respv2(resp, http_resp_body, AT_HTTP_BODY_MAX_SIZE);
     SIM7600_PRINTF("HTTP Response Header: \n%s\n", http_resp_header);
     SIM7600_PRINTF("HTTP Response Body: \n%s\n", http_resp_body);
 
@@ -876,9 +960,10 @@ int sim7600__httpsGET(char* url, char* response, uint16_t maxlength)
 	vTaskDelay(3000 / portTICK_PERIOD_MS);
     //TODO: Check if it's succifient OR need to wait for "OK" OR
     //TODO: wait for full HTTP response message (receive header, body and the #XHTTPCRSP for body should have state = 1)
-    if (__sim7600__wait_4response("#XHTTPCRSP", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
-        return FAILURE; // Failed to receive resp (no "OK" received within timeout")
-
+    if (__sim7600__wait_4response("#XHTTPCRSP:0,1", AT_DEFAULT_TIMEOUT_MS) != SUCCESS)
+    {
+        SIM7600_PRINTF("Failed to receive full HTTP response within timeout, try to parse ... \n");
+    }
     int resp_len = __sim7600__get_resp(resp, sizeof(resp));
     
     #if (TEST_USED_SAMPLE_HTTP_RESP == 1)   // Overwrite resp with sample HTTP response
@@ -886,7 +971,8 @@ int sim7600__httpsGET(char* url, char* response, uint16_t maxlength)
     strncpy(resp, HTTP_RESP_EXAMPLE, AT_BUFFER_SIZE);
     #endif /* End of (TEST_USED_SAMPLE_HTTP_RESP == 1) */
 
-    int ret_val = __sim7600_https_parse_resp(resp, http_resp_header, AT_HTTP_HEADER_MAX_SIZE, http_resp_body, AT_HTTP_BODY_MAX_SIZE);
+    // int ret_val = __sim7600_https_parse_resp(resp, http_resp_header, AT_HTTP_HEADER_MAX_SIZE, http_resp_body, AT_HTTP_BODY_MAX_SIZE);
+    int ret_val = __sim7600_https_parse_respv2(resp, http_resp_body, AT_HTTP_BODY_MAX_SIZE);
     SIM7600_PRINTF("HTTP Response Header: \n%s\n", http_resp_header);
     SIM7600_PRINTF("HTTP Response Body: \n%s\n", http_resp_body);
 
@@ -900,7 +986,7 @@ int sim7600__httpsGET(char* url, char* response, uint16_t maxlength)
     }  
 }
 
-volatile uint8_t g_test = 0;
+volatile uint8_t g_test = 10;
 extern const char howmyssl_ca[];
 extern const char httpbin_ca[];
 void lte_modem_custom_task(void *pvParameters)
@@ -917,24 +1003,7 @@ void lte_modem_custom_task(void *pvParameters)
         {
             case 10:
             {
-                // Clear certificate
-                if( (temp_var = __sim7600__clearCert()) != SUCCESS)
-                {
-                    SIM7600_PRINTF("Failed to clear certificate \r\n ");
-                }
-                else
-                {
-                    SIM7600_PRINTF("Certificate cleared \r\n");
-                }
-                // set CA
-                if( (temp_var = sim7600__setCA(howmyssl_ca)) != SUCCESS)
-                {
-                    SIM7600_PRINTF("Failed to set CA \r\n ");
-                }
-                else
-                {
-                    SIM7600_PRINTF("CA set \r\n");
-                }
+            	//TODO: Send or Parse
                 char url[] = "howsmyssl.com/a/check";
                 char http_resp_buffer[2048] = {0};
                 sim7600__httpsGET(url , http_resp_buffer, sizeof(http_resp_buffer));
@@ -1063,6 +1132,7 @@ void lte_modem_custom_task(void *pvParameters)
                 {
                     SIM7600_PRINTF("Certificate cleared \r\n");
                 }
+                break;
             }
 
             case 8:
