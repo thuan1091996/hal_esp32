@@ -17,13 +17,13 @@
 #include "hal.h"
 #include "nrf_slte.h"
 
-#define TEST_WIFI_API          (0)
-#define TEST_WIFI_HTTP         (0)
+#define TEST_WIFI_API          (1)
+#define TEST_WIFI_HTTP         (1)
 #define TEST_GPIO_API          (0)
 #define TEST_I2C_API           (0)
 #define TEST_ADC_API           (0)
 #define TEST_PWM_API           (0)
-#define TEST_LTE_MODEM_API     (1)
+#define TEST_LTE_MODEM_API     (0)
 
 void wifi_custom__task(void *pvParameters);
 void wifi_custom_http__task(void *pvParameters);

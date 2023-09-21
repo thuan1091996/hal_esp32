@@ -321,21 +321,6 @@ int wifi_init_sta(void)
 int wifi_custom_init(void)
 {
     esp_log_level_set("wifi_custom", ESP_LOG_INFO);
-    //Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    ESP_ERROR_CHECK(ret);
-    if (ESP_OK != ret)
-    {
-        ESP_LOGE("wifi_custom", "Failed to initialize NVS Flash. Erasing and re-initializing...");
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        if (nvs_flash_init() != ESP_OK)
-        {
-            ESP_LOGE("wifi_custom", "Failed to erase and re-initialize NVS Flash. Aborting...");
-            return -1;
-        }
-    }
-    ESP_LOGI("wifi_custom", "NVS Flash initialized \r\n");   
-
     if ( wifi_custom__getCA(wifi_cert, CERT_MAX_LEN) != 0)
     {
         ESP_LOGE("wifi_http", "Failed to get certificate");
@@ -571,6 +556,14 @@ int wifi_custom__setCA(char* cert)
 }
 
 /* ===================================== HTTP  =====================================*/
+//TODO: DELETE
+int netmanaddOTA_Data(char *ota_write_data, int len){
+    // LOG input data
+    ESP_LOGE("wifi_ota", "==== WIFI OTA data received: %d bytes ==== ", len);
+    ESP_LOG_BUFFER_CHAR("wifi_ota", ota_write_data, len);
+    return 0;
+}
+
 #include <esp_http_client.h>
 typedef struct
 {
@@ -625,6 +618,53 @@ static esp_err_t https_event_handle(esp_http_client_event_t *evt)
 
         case HTTP_EVENT_DISCONNECTED:
             ESP_LOGI("wifi_http", "HTTPS_EVENT_DISCONNECTED");
+            break;
+
+    }
+    return ESP_OK;
+}
+
+static esp_err_t ota_https_event_handle(esp_http_client_event_t *evt)
+{
+    switch(evt->event_id) {
+        case HTTP_EVENT_ERROR:
+            ESP_LOGI("wifi_ota", "HTTPS_EVENT_ERROR");
+            break;
+
+        case HTTP_EVENT_ON_CONNECTED:
+            ESP_LOGI("wifi_ota", "HTTPS_EVENT_ON_CONNECTED");
+            ESP_LOGI("wifi_ota", "Client handler to: 0x%X", (unsigned int)evt->client);
+            break;
+
+        case HTTP_EVENT_HEADER_SENT:
+            ESP_LOGI("wifi_ota", "HTTPS_EVENT_HEADER_SENT");
+            break;
+
+        case HTTP_EVENT_ON_HEADER:
+            ESP_LOGI("wifi_ota", "Received header data: %s: %s", evt->header_key, evt->header_value);
+            break;
+
+        case HTTP_EVENT_ON_DATA:
+            // ESP_LOGI("wifi_ota", "HTTPS_EVENT_ON_DATA, len=%d", evt->data_len);
+			// ESP_LOGI("wifi_ota", "HTTP response data: %s \r\n", (char*)evt->data);
+
+        	//TODO: Store receive data into NVS DATA PARTITION
+            if ( netmanaddOTA_Data(evt->data, evt->data_len) != 0)
+            {
+                ESP_LOGE("wifi_http", "Failed to store OTA data");
+            }
+            break;
+
+        case HTTP_EVENT_ON_FINISH:
+            ESP_LOGI("wifi_ota", "HTTPS_EVENT_ON_FINISH");
+            ESP_LOGI("wifi_ota", "====== OTA Finish ====== ");
+            break;
+
+		case HTTP_EVENT_REDIRECT:
+            break;
+
+        case HTTP_EVENT_DISCONNECTED:
+            ESP_LOGI("wifi_ota", "HTTPS_EVENT_DISCONNECTED");
             break;
 
     }
@@ -698,6 +738,47 @@ int wifi_custom__httpsGET(char* url, char* response, uint16_t maxlength)
 	esp_http_client_cleanup(client);
     free(recv_payload.p_payload);
     return http_status;
+}
+
+int wifi_custom_OTA_httpsGET(char* url)
+{
+    param_check(url != NULL);
+
+	esp_http_client_config_t https_request_conf =
+	{
+		.event_handler = ota_https_event_handle,
+        .url = url,
+	};
+    ESP_LOGI("wifi_ota", "URL: %s", https_request_conf.url);
+
+    // Config certificate 
+    if(strlen(wifi_cert) > 0)
+    {
+        // https_request_conf.cert_pem = wifi_cert;
+        https_request_conf.cert_pem = wifi_cert;
+        https_request_conf.cert_len = strlen(wifi_cert) + 1;
+    }
+    else
+    {
+        ESP_LOGE("wifi_ota", "Certificate is not valid");
+        return -1;
+    }
+    ESP_LOGI("wifi_ota", "Certificate: %s", https_request_conf.cert_pem);
+
+	esp_http_client_handle_t client = esp_http_client_init(&https_request_conf);
+	if(NULL == client)
+    {
+        ESP_LOGE("wifi_ota", "Failed to initialize HTTP connection");
+        return -1;
+    }
+
+    esp_err_t err = esp_http_client_perform(client);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE("wifi_ota", "Perform HTTPS failed: %s", esp_err_to_name(err));
+    }
+	esp_http_client_cleanup(client);
+    return SUCCESS;
 }
 
 int wifi_custom__httpsPOST(char* url, char* JSONdata, char* agent, char* response, uint16_t maxlength)
@@ -829,6 +910,8 @@ const char howmyssl_ca[] =
 "emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=\n" \
 "-----END CERTIFICATE-----\n";
 
+
+
 const char httpbin_ca[] = 
 "-----BEGIN CERTIFICATE-----\n" \
 "MIIDQTCCAimgAwIBAgITBmyfz5m/jAo54vB4ikPmljZbyjANBgkqhkiG9w0BAQsF\n" \
@@ -852,18 +935,52 @@ const char httpbin_ca[] =
 "-----END CERTIFICATE-----\n";
 
 
+const char google_drive_cert[] =
+"-----BEGIN CERTIFICATE-----\n" \
+"MIIFljCCA36gAwIBAgINAgO8U1lrNMcY9QFQZjANBgkqhkiG9w0BAQsFADBHMQsw\n" \
+"CQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEU\n" \
+"MBIGA1UEAxMLR1RTIFJvb3QgUjEwHhcNMjAwODEzMDAwMDQyWhcNMjcwOTMwMDAw\n" \
+"MDQyWjBGMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZp\n" \
+"Y2VzIExMQzETMBEGA1UEAxMKR1RTIENBIDFDMzCCASIwDQYJKoZIhvcNAQEBBQAD\n" \
+"ggEPADCCAQoCggEBAPWI3+dijB43+DdCkH9sh9D7ZYIl/ejLa6T/belaI+KZ9hzp\n" \
+"kgOZE3wJCor6QtZeViSqejOEH9Hpabu5dOxXTGZok3c3VVP+ORBNtzS7XyV3NzsX\n" \
+"lOo85Z3VvMO0Q+sup0fvsEQRY9i0QYXdQTBIkxu/t/bgRQIh4JZCF8/ZK2VWNAcm\n" \
+"BA2o/X3KLu/qSHw3TT8An4Pf73WELnlXXPxXbhqW//yMmqaZviXZf5YsBvcRKgKA\n" \
+"gOtjGDxQSYflispfGStZloEAoPtR28p3CwvJlk/vcEnHXG0g/Zm0tOLKLnf9LdwL\n" \
+"tmsTDIwZKxeWmLnwi/agJ7u2441Rj72ux5uxiZ0CAwEAAaOCAYAwggF8MA4GA1Ud\n" \
+"DwEB/wQEAwIBhjAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwEgYDVR0T\n" \
+"AQH/BAgwBgEB/wIBADAdBgNVHQ4EFgQUinR/r4XN7pXNPZzQ4kYU83E1HScwHwYD\n" \
+"VR0jBBgwFoAU5K8rJnEaK0gnhS9SZizv8IkTcT4waAYIKwYBBQUHAQEEXDBaMCYG\n" \
+"CCsGAQUFBzABhhpodHRwOi8vb2NzcC5wa2kuZ29vZy9ndHNyMTAwBggrBgEFBQcw\n" \
+"AoYkaHR0cDovL3BraS5nb29nL3JlcG8vY2VydHMvZ3RzcjEuZGVyMDQGA1UdHwQt\n" \
+"MCswKaAnoCWGI2h0dHA6Ly9jcmwucGtpLmdvb2cvZ3RzcjEvZ3RzcjEuY3JsMFcG\n" \
+"A1UdIARQME4wOAYKKwYBBAHWeQIFAzAqMCgGCCsGAQUFBwIBFhxodHRwczovL3Br\n" \
+"aS5nb29nL3JlcG9zaXRvcnkvMAgGBmeBDAECATAIBgZngQwBAgIwDQYJKoZIhvcN\n" \
+"AQELBQADggIBAIl9rCBcDDy+mqhXlRu0rvqrpXJxtDaV/d9AEQNMwkYUuxQkq/BQ\n" \
+"cSLbrcRuf8/xam/IgxvYzolfh2yHuKkMo5uhYpSTld9brmYZCwKWnvy15xBpPnrL\n" \
+"RklfRuFBsdeYTWU0AIAaP0+fbH9JAIFTQaSSIYKCGvGjRFsqUBITTcFTNvNCCK9U\n" \
+"+o53UxtkOCcXCb1YyRt8OS1b887U7ZfbFAO/CVMkH8IMBHmYJvJh8VNS/UKMG2Yr\n" \
+"PxWhu//2m+OBmgEGcYk1KCTd4b3rGS3hSMs9WYNRtHTGnXzGsYZbr8w0xNPM1IER\n" \
+"lQCh9BIiAfq0g3GvjLeMcySsN1PCAJA/Ef5c7TaUEDu9Ka7ixzpiO2xj2YC/WXGs\n" \
+"Yye5TBeg2vZzFb8q3o/zpWwygTMD0IZRcZk0upONXbVRWPeyk+gB9lm+cZv9TSjO\n" \
+"z23HFtz30dZGm6fKa+l3D/2gthsjgx0QGtkJAITgRNOidSOzNIb2ILCkXhAd4FJG\n" \
+"AJ2xDx8hcFH1mt0G/FX0Kw4zd8NLQsLxdxP8c4CU6x+7Nz/OAipmsHMdMqUybDKw\n" \
+"juDEI/9bfU1lcKwrmz3O2+BtjjKAvpafkmO8l7tdufThcV4q5O8DIrGKZTqPwJNl\n" \
+"1IXNDw9bg1kWRxYtnCQ6yICmJhSFm/Y3m6xv+cXDBlHz4n/FsRC6UfTd\n" \
+"-----END CERTIFICATE-----\n";
+
 int wifi_custom_test_https_get()
 {
-    char url[] = "https://www.howsmyssl.com/a/check";
+    char url[] = "https://drive.google.com/uc?id=1Q5vSlZQfWKRGBR-wJglhjyeqiBs9X_Ss&export=download";
     char resp_buff[2048] = {0};
     // Print certificate
-    wifi_custom__setCA(howmyssl_ca);
+    wifi_custom__setCA(google_drive_cert);
     memset(wifi_cert, 0, sizeof(wifi_cert));
 
     if ( wifi_custom__getCA(wifi_cert, CERT_MAX_LEN) != 0)
     {
         ESP_LOGE("wifi_http", "Failed to get certificate");
-        wifi_custom__setCA(howmyssl_ca);
+        wifi_custom__setCA(google_drive_cert);
         memset(wifi_cert, 0, sizeof(wifi_cert));
         if ( wifi_custom__getCA(wifi_cert, CERT_MAX_LEN) != 0)
         {
@@ -872,7 +989,7 @@ int wifi_custom_test_https_get()
         }
     }
     ESP_LOGI("wifi_http", "Certificate length: %d", strlen(wifi_cert));
-    if (wifi_custom__httpsGET(url, resp_buff, 2048) != 0)
+    if (wifi_custom_OTA_httpsGET(url) != 0)
     {
         ESP_LOGE("wifi_http", "Failed to get response");
         return -1;
@@ -924,11 +1041,11 @@ void wifi_custom_http__task(void *pvParameters)
 
         while(wifi_custom__connected())
         {
-            if (wifi_custom_test_https_post() != 0)
-            {
-                ESP_LOGE("wifi_http", "Failed to get response");
-            }
-            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            // if (wifi_custom_test_https_post() != 0)
+            // {
+            //     ESP_LOGE("wifi_http", "Failed to get response");
+            // }
+            // vTaskDelay(5000 / portTICK_PERIOD_MS);
 
             if (wifi_custom_test_https_get() != 0)
             {
