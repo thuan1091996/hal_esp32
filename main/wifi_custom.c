@@ -48,10 +48,13 @@
 /******************************************************************************
 * Module Preprocessor Constants
 *******************************************************************************/
-#define LOAD_WIFI_CREDENTIAL_NVS    (1)
-#define WIFI_RETRY_CONN_MAX  	    (5)
-#define CERT_MAX_LEN                (2048)
-#define CERT_LOAD_TO_RAM            (1)     /* Set to 1 will load cert to "wifi_cert" when write cert*/
+#define WIFI_HTTPS_DEFAULT_TIMEOUT_MS   (10000)
+#define WIFI_RETRY_CONN_MAX             (5)
+#define WIFI_SSID_MAX_LEN               (32)
+#define WIFI_PASS_MAX_LEN               (64)
+#define WIFI_CERT_MAX_LEN               (2048)
+#define WIFI_CONFIG_LOAD_CERT_TO_RAM    (1) /* Set to 1 will load cert to "wifi_cert" when write cert*/
+#define WIFI_CONFIG_LOAD_CREDENTIAL_NVS (1) /* Set to 1 to load Wi-Fi credential from NVS */
 
 
 #define WIFI_CONNECTED_BIT 			BIT0
@@ -73,9 +76,9 @@
 /******************************************************************************
 * Module Variable Definitions
 *******************************************************************************/
-static uint8_t ssid[33] = { 0 };
-static uint8_t password[65] = { 0 };
-static char wifi_cert[CERT_MAX_LEN] = {0};  
+static uint8_t ssid[WIFI_SSID_MAX_LEN] = { 0 };
+static uint8_t password[WIFI_PASS_MAX_LEN] = { 0 };
+static char wifi_cert[WIFI_CERT_MAX_LEN] = {0};  
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
 /******************************************************************************
@@ -288,8 +291,7 @@ int wifi_init_sta(void)
             },
         };
 
-        #define LOAD_WIFI_CREDENTIAL_NVS (1)
-        #if LOAD_WIFI_CREDENTIAL_NVS
+        #if WIFI_CONFIG_LOAD_CREDENTIAL_NVS
             wifi_config_t wifi_config_loaded = {0};
             if (esp_wifi_get_config(WIFI_IF_STA, &wifi_config_loaded) == ESP_OK)
             {
@@ -307,7 +309,7 @@ int wifi_init_sta(void)
                     ESP_LOGE("wifi_custom", "No SSID stored in NVS");
                 }
             }
-        #endif /* End of LOAD_WIFI_CREDENTIAL_NVS */
+        #endif /* End of WIFI_CONFIG_LOAD_CREDENTIAL_NVS */
 
             ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
             ESP_LOGI("wifi_custom", "wifi_init_sta finished.");
@@ -321,7 +323,7 @@ int wifi_init_sta(void)
 int wifi_custom_init(void)
 {
     esp_log_level_set("wifi_custom", ESP_LOG_INFO);
-    if ( wifi_custom__getCA(wifi_cert, CERT_MAX_LEN) != 0)
+    if ( wifi_custom__getCA(wifi_cert, WIFI_CERT_MAX_LEN) != 0)
     {
         ESP_LOGE("wifi_http", "Failed to get certificate");
     }
@@ -541,10 +543,10 @@ int wifi_custom__setCA(char* cert)
 
         ESP_LOGI("wifi_custom", "Certificate written successfully");
 
-#if (CERT_LOAD_TO_RAM != 0) 
+#if (WIFI_CONFIG_LOAD_CERT_TO_RAM != 0) 
         memset(wifi_cert, 0, sizeof(wifi_cert));
         strcpy(wifi_cert, cert);
-#endif /*(CERT_LOAD_TO_RAM != 0) */
+#endif /*(WIFI_CONFIG_LOAD_CERT_TO_RAM != 0) */
 
         nvs_close(handle);
         return 0;
@@ -560,7 +562,7 @@ int wifi_custom__setCA(char* cert)
 int netmanaddOTA_Data(char *ota_write_data, int len){
     // LOG input data
     ESP_LOGE("wifi_ota", "==== WIFI OTA data received: %d bytes ==== ", len);
-    ESP_LOG_BUFFER_CHAR("wifi_ota", ota_write_data, len);
+    ESP_LOG_BUFFER_HEXDUMP("wifi_ota", ota_write_data, len, ESP_LOG_INFO);
     return 0;
 }
 
@@ -645,19 +647,17 @@ static esp_err_t ota_https_event_handle(esp_http_client_event_t *evt)
             break;
 
         case HTTP_EVENT_ON_DATA:
-            // ESP_LOGI("wifi_ota", "HTTPS_EVENT_ON_DATA, len=%d", evt->data_len);
-			// ESP_LOGI("wifi_ota", "HTTP response data: %s \r\n", (char*)evt->data);
-
+            ESP_LOGI("wifi_ota", "HTTPS_EVENT_ON_DATA, len=%d", evt->data_len);
         	//TODO: Store receive data into NVS DATA PARTITION
             if ( netmanaddOTA_Data(evt->data, evt->data_len) != 0)
             {
-                ESP_LOGE("wifi_http", "Failed to store OTA data");
+                ESP_LOGE("wifi_ota", "Failed to store OTA data");
             }
             break;
 
         case HTTP_EVENT_ON_FINISH:
             ESP_LOGI("wifi_ota", "HTTPS_EVENT_ON_FINISH");
-            ESP_LOGI("wifi_ota", "====== OTA Finish ====== ");
+            ESP_LOGW("wifi_ota", "====== OTA Finish ====== ");
             break;
 
 		case HTTP_EVENT_REDIRECT:
@@ -748,6 +748,7 @@ int wifi_custom_OTA_httpsGET(char* url)
 	{
 		.event_handler = ota_https_event_handle,
         .url = url,
+        .timeout_ms = WIFI_HTTPS_DEFAULT_TIMEOUT_MS,
 	};
     ESP_LOGI("wifi_ota", "URL: %s", https_request_conf.url);
 
@@ -797,7 +798,7 @@ int wifi_custom__httpsPOST(char* url, char* JSONdata, char* agent, char* respons
 	{
 		.event_handler = https_event_handle,
 		.user_data = (void*)&recv_payload,
-        .timeout_ms = 10000,
+        .timeout_ms = WIFI_HTTPS_DEFAULT_TIMEOUT_MS,
         .url = url,
         .user_agent = agent,
 	};
@@ -977,12 +978,12 @@ int wifi_custom_test_https_get()
     wifi_custom__setCA(google_drive_cert);
     memset(wifi_cert, 0, sizeof(wifi_cert));
 
-    if ( wifi_custom__getCA(wifi_cert, CERT_MAX_LEN) != 0)
+    if ( wifi_custom__getCA(wifi_cert, WIFI_CERT_MAX_LEN) != 0)
     {
         ESP_LOGE("wifi_http", "Failed to get certificate");
         wifi_custom__setCA(google_drive_cert);
         memset(wifi_cert, 0, sizeof(wifi_cert));
-        if ( wifi_custom__getCA(wifi_cert, CERT_MAX_LEN) != 0)
+        if ( wifi_custom__getCA(wifi_cert, WIFI_CERT_MAX_LEN) != 0)
         {
             ESP_LOGE("wifi_http", "Failed to get certificate");
             return -1;
@@ -1006,12 +1007,12 @@ int wifi_custom_test_https_post()
     // Print certificated
     wifi_custom__setCA(httpbin_ca);
     memset(wifi_cert, 0, sizeof(wifi_cert));
-    if ( wifi_custom__getCA(wifi_cert, CERT_MAX_LEN) != 0)
+    if ( wifi_custom__getCA(wifi_cert, WIFI_CERT_MAX_LEN) != 0)
     {
         ESP_LOGE("wifi_http", "Failed to get certificate");
         wifi_custom__setCA(httpbin_ca);
         memset(wifi_cert, 0, sizeof(wifi_cert));
-        if ( wifi_custom__getCA(wifi_cert, CERT_MAX_LEN) != 0)
+        if ( wifi_custom__getCA(wifi_cert, WIFI_CERT_MAX_LEN) != 0)
         {
             ESP_LOGE("wifi_http", "Failed to get certificate");
             return -1;
