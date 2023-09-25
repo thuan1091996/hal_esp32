@@ -628,6 +628,7 @@ static esp_err_t https_event_handle(esp_http_client_event_t *evt)
 
 static esp_err_t ota_https_event_handle(esp_http_client_event_t *evt)
 {
+    uint32_t *recv_len = (uint32_t*)evt->user_data;
     switch(evt->event_id) {
         case HTTP_EVENT_ERROR:
             ESP_LOGI("wifi_ota", "HTTPS_EVENT_ERROR");
@@ -636,6 +637,7 @@ static esp_err_t ota_https_event_handle(esp_http_client_event_t *evt)
         case HTTP_EVENT_ON_CONNECTED:
             ESP_LOGI("wifi_ota", "HTTPS_EVENT_ON_CONNECTED");
             ESP_LOGI("wifi_ota", "Client handler to: 0x%X", (unsigned int)evt->client);
+            *recv_len = 0;
             break;
 
         case HTTP_EVENT_HEADER_SENT:
@@ -649,6 +651,7 @@ static esp_err_t ota_https_event_handle(esp_http_client_event_t *evt)
         case HTTP_EVENT_ON_DATA:
             ESP_LOGI("wifi_ota", "HTTPS_EVENT_ON_DATA, len=%d", evt->data_len);
         	//TODO: Store receive data into NVS DATA PARTITION
+            *recv_len += evt->data_len;
             if ( netmanaddOTA_Data(evt->data, evt->data_len) != 0)
             {
                 ESP_LOGE("wifi_ota", "Failed to store OTA data");
@@ -740,12 +743,14 @@ int wifi_custom__httpsGET(char* url, char* response, uint16_t maxlength)
     return http_status;
 }
 
-int wifi_custom_OTA_httpsGET(char* url)
+int wifi_custom_OTA_httpsGET(char* url, uint32_t *data_len)
 {
     param_check(url != NULL);
 
+    uint32_t recv_len = 0;
 	esp_http_client_config_t https_request_conf =
 	{
+        .user_data = (void*)&recv_len,
 		.event_handler = ota_https_event_handle,
         .url = url,
         .timeout_ms = WIFI_HTTPS_DEFAULT_TIMEOUT_MS,
@@ -779,6 +784,7 @@ int wifi_custom_OTA_httpsGET(char* url)
         ESP_LOGE("wifi_ota", "Perform HTTPS failed: %s", esp_err_to_name(err));
     }
 	esp_http_client_cleanup(client);
+    *data_len = recv_len;
     return SUCCESS;
 }
 
@@ -990,12 +996,13 @@ int wifi_custom_test_https_get()
         }
     }
     ESP_LOGI("wifi_http", "Certificate length: %d", strlen(wifi_cert));
-    if (wifi_custom_OTA_httpsGET(url) != 0)
+    uint32_t data_recv_len = 0;
+    if (wifi_custom_OTA_httpsGET(url, &data_recv_len) != 0)
     {
         ESP_LOGE("wifi_http", "Failed to get response");
         return -1;
     }
-    ESP_LOGI("wifi_http", "Response: %s", resp_buff);
+    ESP_LOGI("wifi_http", "OTA packet len: %ld Response: %s", data_recv_len, resp_buff);
     return 0;
 }
 int wifi_custom_test_https_post()
